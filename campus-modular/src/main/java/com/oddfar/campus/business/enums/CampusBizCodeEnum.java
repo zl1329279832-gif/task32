@@ -55,7 +55,34 @@ public enum CampusBizCodeEnum {
      */
     COMMENT_IS_NULL(13001,"评论不存在"),
     COMMENT_DEL_ERR(13002,"评论删除失败"),
+    COMMENT_BLOCKED(13003,"评论包含违规内容"),
+    COMMENT_STATUS_ABNORMAL(13004,"评论状态异常"),
 
+    /**
+     * 审核
+     */
+    MODERATION_CONTENT_NOT_EXIST(14001,"审核内容不存在"),
+    MODERATION_INVALID_ACTION(14002,"无效的审核操作"),
+    MODERATION_BATCH_EMPTY(14003,"批量操作列表不能为空"),
+
+    /**
+     * 申诉
+     */
+    APPEAL_NOT_EXIST(15101,"申诉记录不存在"),
+    APPEAL_NOT_OWN(15102,"无权操作此申诉"),
+    APPEAL_ALREADY_EXISTS(15103,"已存在进行中的申诉"),
+    APPEAL_TARGET_NOT_ELIGIBLE(15104,"该内容当前状态不支持申诉"),
+    APPEAL_ALREADY_REVIEWED(15105,"申诉已处理"),
+
+    /**
+     * 信用
+     */
+    CREDIT_SCORE_INSUFFICIENT(16001,"信用分不足"),
+
+    /**
+     * 敏感词
+     */
+    SENSITIVE_WORD_DUPLICATE(17001,"敏感词已存在"),
 
     SMS_SEND_CODE_EXCEPTION(10403, "短信发送失败"),
     PHONE_EXIST_EXCEPTION(15002, "手机号已经存在"),

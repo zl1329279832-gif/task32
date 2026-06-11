@@ -9,8 +9,12 @@ import com.oddfar.campus.business.core.expander.CampusConfigExpander;
 import com.oddfar.campus.business.domain.entity.CategoryEntity;
 import com.oddfar.campus.business.domain.entity.ContentEntity;
 import com.oddfar.campus.business.domain.entity.ContentTagEntity;
+import com.oddfar.campus.business.domain.entity.ModerationRecordEntity;
+import com.oddfar.campus.business.domain.entity.ViolationRecordEntity;
+import com.oddfar.campus.business.domain.entity.CommentEntity;
 import com.oddfar.campus.business.domain.vo.CampusFileVo;
 import com.oddfar.campus.business.domain.vo.ContentVo;
+import com.oddfar.campus.business.domain.vo.ModerationResultVo;
 import com.oddfar.campus.business.domain.vo.SendContentVo;
 import com.oddfar.campus.business.enums.CampusBizCodeEnum;
 import com.oddfar.campus.business.mapper.ContentLoveMapper;
@@ -19,6 +23,9 @@ import com.oddfar.campus.business.service.CampusFileService;
 import com.oddfar.campus.business.service.CategoryService;
 import com.oddfar.campus.business.service.ContentService;
 import com.oddfar.campus.business.service.TagService;
+import com.oddfar.campus.business.service.ModerationService;
+import com.oddfar.campus.business.service.ModerationRecordService;
+import com.oddfar.campus.business.service.ViolationRecordService;
 import com.oddfar.campus.common.core.page.PageUtils;
 import com.oddfar.campus.common.domain.PageResult;
 import com.oddfar.campus.common.exception.ServiceException;
@@ -50,6 +57,14 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
     private CampusFileService fileService;
     @Resource
     private TagService tagService;
+    @Resource
+    private ModerationService moderationService;
+    @Resource
+    private ModerationRecordService moderationRecordService;
+    @Resource
+    private ViolationRecordService violationRecordService;
+    @Resource
+    private com.oddfar.campus.business.mapper.CommentMapper commentMapper;
 
     @Override
     public PageResult<ContentVo> page(ContentEntity contentEntity) {
@@ -131,7 +146,8 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
         BeanUtil.copyProperties(sendContentVo, contentEntity);
 
         //设置信息
-        contentEntity.setUserId(SecurityUtils.getUserId());
+        Long userId = SecurityUtils.getUserId();
+        contentEntity.setUserId(userId);
         if (sendContentVo.getFileList() != null && sendContentVo.getFileList().size() > 0) {
             contentEntity.setFileCount(sendContentVo.getFileList().size());
 
@@ -141,10 +157,40 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
         }
 
         contentEntity.setContentId(IdWorker.getId());
-        contentEntity.setStatus(0);
+
+        // 自动审核
+        ModerationResultVo moderationResult = moderationService.moderateContent(sendContentVo, userId);
+        contentEntity.setStatus(moderationResult.getDecision());
+
         int insert = contentMapper.insert(contentEntity);
         //更新文件数据库
         fileService.updateContentFile(sendContentVo.getFileList(), contentEntity.getContentId());
+
+        // 记录审核记录
+        ModerationRecordEntity record = new ModerationRecordEntity();
+        record.setRecordId(IdWorker.getId());
+        record.setTargetType(1);
+        record.setTargetId(contentEntity.getContentId());
+        record.setUserId(userId);
+        record.setAction(moderationResult.getDecision());
+        record.setTriggerType(0);
+        record.setAutoReason(String.join("; ", moderationResult.getReasons()));
+        record.setRiskScore(moderationResult.getRiskScore());
+        moderationRecordService.addRecord(record);
+
+        // 如果被拦截，创建违规记录
+        if (moderationResult.getDecision() == 3) {
+            ViolationRecordEntity violation = new ViolationRecordEntity();
+            violation.setUserId(userId);
+            violation.setTargetType(1);
+            violation.setTargetId(contentEntity.getContentId());
+            violation.setViolationType("auto_moderation");
+            violation.setDescription(String.join("; ", moderationResult.getReasons()));
+            violation.setPenaltyType(2);
+            violation.setCreditDeduct(10);
+            violation.setRecordId(record.getRecordId());
+            violationRecordService.addViolation(violation);
+        }
 
         return insert;
     }
@@ -201,6 +247,34 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
         } else {
             return false;
         }
+    }
+
+    @Override
+    @Transactional
+    public void restoreContentWithInteractions(Long contentId) {
+        ContentEntity content = contentMapper.selectById(contentId);
+        if (content == null) {
+            return;
+        }
+        // 恢复内容状态
+        content.setStatus(1);
+
+        // 回补点赞数：从campus_content_love表重新统计
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.oddfar.campus.business.domain.entity.ContentLoveEntity> loveWrapper =
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+        loveWrapper.eq(com.oddfar.campus.business.domain.entity.ContentLoveEntity::getContentId, contentId);
+        long loveCount = contentLoveMapper.selectCount(loveWrapper);
+        content.setLoveCount(loveCount);
+
+        contentMapper.updateById(content);
+
+        // 解冻关联评论
+        com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<CommentEntity> commentWrapper =
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
+        commentWrapper.eq(CommentEntity::getContentId, contentId)
+                      .eq(CommentEntity::getStatus, 2)
+                      .set(CommentEntity::getStatus, 1);
+        commentMapper.update(null, commentWrapper);
     }
 
 

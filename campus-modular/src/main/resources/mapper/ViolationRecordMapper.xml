@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.oddfar.campus.business.mapper.ViolationRecordMapper">
+
+    <resultMap type="com.oddfar.campus.business.domain.entity.ViolationRecordEntity" id="ViolationRecordResult">
+        <id     property="violationId"   column="violation_id"/>
+        <result property="userId"        column="user_id"/>
+        <result property="targetType"    column="target_type"/>
+        <result property="targetId"      column="target_id"/>
+        <result property="violationType" column="violation_type"/>
+        <result property="description"   column="description"/>
+        <result property="penaltyType"   column="penalty_type"/>
+        <result property="creditDeduct"  column="credit_deduct"/>
+        <result property="recordId"      column="record_id"/>
+        <result property="createTime"    column="create_time"/>
+        <result property="createUser"    column="create_user"/>
+        <result property="updateTime"    column="update_time"/>
+        <result property="updateUser"    column="update_user"/>
+    </resultMap>
+
+    <sql id="selectViolation">
+        SELECT v.violation_id, v.user_id, v.target_type, v.target_id,
+               v.violation_type, v.description, v.penalty_type,
+               v.credit_deduct, v.record_id,
+               v.create_time, v.create_user, v.update_time, v.update_user
+        FROM campus_violation_record v
+    </sql>
+
+    <select id="selectViolationPage" parameterType="com.oddfar.campus.business.domain.entity.ViolationRecordEntity"
+            resultMap="ViolationRecordResult">
+        <include refid="selectViolation"/>
+        <where>
+            v.del_flag = 0
+            <if test="userId != null">
+                AND v.user_id = #{userId}
+            </if>
+            <if test="targetType != null">
+                AND v.target_type = #{targetType}
+            </if>
+            <if test="violationType != null and violationType != ''">
+                AND v.violation_type = #{violationType}
+            </if>
+            <if test="params != null and params.beginTime != null and params.beginTime != ''">
+                AND date_format(v.create_time,'%y%m%d') &gt;= date_format(#{params.beginTime},'%y%m%d')
+            </if>
+            <if test="params != null and params.endTime != null and params.endTime != ''">
+                AND date_format(v.create_time,'%y%m%d') &lt;= date_format(#{params.endTime},'%y%m%d')
+            </if>
+        </where>
+        ORDER BY v.create_time DESC
+    </select>
+
+</mapper>

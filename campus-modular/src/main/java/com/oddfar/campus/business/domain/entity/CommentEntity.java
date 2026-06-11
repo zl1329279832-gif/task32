@@ -54,6 +54,11 @@ public class CommentEntity extends BaseEntity {
     private String coContent;
 
     /**
+     * 状态: 0=待审, 1=正常, 2=冻结
+     */
+    private Integer status;
+
+    /**
      * 评论时的ip
      */
     private String ip;

@@ -1,8 +1,11 @@
 package com.oddfar.campus.business.controller.admin;
 
 import com.oddfar.campus.business.domain.entity.ContentEntity;
+import com.oddfar.campus.business.domain.vo.BatchModerationVo;
 import com.oddfar.campus.business.domain.vo.ContentVo;
 import com.oddfar.campus.business.service.ContentService;
+import com.oddfar.campus.business.service.ModerationRecordService;
+import com.oddfar.campus.business.service.ViolationRecordService;
 import com.oddfar.campus.common.annotation.ApiResource;
 import com.oddfar.campus.common.core.page.PageUtils;
 import com.oddfar.campus.common.domain.PageResult;

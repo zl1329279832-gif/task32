@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.oddfar.campus.business.mapper.AppealMapper">
+
+    <resultMap type="com.oddfar.campus.business.domain.entity.AppealEntity" id="AppealResult">
+        <id     property="appealId"     column="appeal_id"/>
+        <result property="userId"       column="user_id"/>
+        <result property="targetType"   column="target_type"/>
+        <result property="targetId"     column="target_id"/>
+        <result property="reason"       column="reason"/>
+        <result property="evidenceUrls" column="evidence_urls"/>
+        <result property="status"       column="status"/>
+        <result property="reviewerId"   column="reviewer_id"/>
+        <result property="reviewRemark" column="review_remark"/>
+        <result property="reviewTime"   column="review_time"/>
+        <result property="createTime"   column="create_time"/>
+        <result property="createUser"   column="create_user"/>
+        <result property="updateTime"   column="update_time"/>
+        <result property="updateUser"   column="update_user"/>
+    </resultMap>
+
+    <sql id="selectAppeal">
+        SELECT a.appeal_id, a.user_id, a.target_type, a.target_id,
+               a.reason, a.evidence_urls, a.status,
+               a.reviewer_id, a.review_remark, a.review_time,
+               a.create_time, a.create_user, a.update_time, a.update_user
+        FROM campus_appeal a
+    </sql>
+
+    <select id="selectAppealPage" parameterType="com.oddfar.campus.business.domain.entity.AppealEntity"
+            resultMap="AppealResult">
+        <include refid="selectAppeal"/>
+        <where>
+            a.del_flag = 0
+            <if test="userId != null">
+                AND a.user_id = #{userId}
+            </if>
+            <if test="status != null">
+                AND a.status = #{status}
+            </if>
+            <if test="targetType != null">
+                AND a.target_type = #{targetType}
+            </if>
+            <if test="targetId != null">
+                AND a.target_id = #{targetId}
+            </if>
+            <if test="params != null and params.beginTime != null and params.beginTime != ''">
+                AND date_format(a.create_time,'%y%m%d') &gt;= date_format(#{params.beginTime},'%y%m%d')
+            </if>
+            <if test="params != null and params.endTime != null and params.endTime != ''">
+                AND date_format(a.create_time,'%y%m%d') &lt;= date_format(#{params.endTime},'%y%m%d')
+            </if>
+        </where>
+        ORDER BY a.create_time DESC
+    </select>
+
+</mapper>

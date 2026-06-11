@@ -5,10 +5,12 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.oddfar.campus.business.domain.entity.CommentEntity;
 import com.oddfar.campus.business.domain.entity.ContentEntity;
 import com.oddfar.campus.business.domain.vo.CommentVo;
+import com.oddfar.campus.business.domain.vo.ModerationResultVo;
 import com.oddfar.campus.business.enums.CampusBizCodeEnum;
 import com.oddfar.campus.business.mapper.CommentMapper;
 import com.oddfar.campus.business.mapper.ContentMapper;
 import com.oddfar.campus.business.service.CommentService;
+import com.oddfar.campus.business.service.ModerationService;
 import com.oddfar.campus.common.core.page.PageUtils;
 import com.oddfar.campus.common.domain.PageResult;
 import com.oddfar.campus.common.exception.ServiceException;
@@ -33,6 +35,8 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, CommentEntity
     private CommentMapper commentMapper;
     @Autowired
     private ContentMapper contentMapper;
+    @Autowired
+    private ModerationService moderationService;
 
     @Override
     public PageResult<CommentEntity> page(CommentEntity comment) {
@@ -152,6 +156,15 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, CommentEntity
         comment.setUserId(userId);
         comment.setIp(IpUtils.getIpAddr(ServletUtils.getRequest()));
         comment.setAddress(AddressUtils.getRealAddressByIP(comment.getIp()));
+
+        // 自动审核评论
+        ModerationResultVo moderationResult = moderationService.moderateComment(comment);
+        if (moderationResult.getDecision() == 3) {
+            throw new ServiceException(CampusBizCodeEnum.COMMENT_BLOCKED.getMsg(),
+                    CampusBizCodeEnum.COMMENT_BLOCKED.getCode());
+        }
+        comment.setStatus(moderationResult.getDecision() == 1 ? 1 : 0);
+
         commentMapper.insert(comment);
         return comment.getCommentId();
     }

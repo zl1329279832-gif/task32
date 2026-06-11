@@ -104,4 +104,11 @@ public interface ContentService extends IService<ContentEntity> {
      * @return
      */
     boolean checkOwnContent(Long contentId);
+
+    /**
+     * 恢复内容并回补互动数据
+     *
+     * @param contentId
+     */
+    void restoreContentWithInteractions(Long contentId);
 }
