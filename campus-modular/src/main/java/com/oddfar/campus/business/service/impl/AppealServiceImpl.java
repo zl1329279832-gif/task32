@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.oddfar.campus.business.domain.entity.*;
 import com.oddfar.campus.business.enums.CampusBizCodeEnum;
 import com.oddfar.campus.business.mapper.AppealMapper;
-import com.oddfar.campus.business.mapper.CommentMapper;
 import com.oddfar.campus.business.mapper.ContentMapper;
 import com.oddfar.campus.business.service.*;
 import com.oddfar.campus.common.core.LambdaQueryWrapperX;
@@ -31,11 +30,9 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
     @Autowired
     private ContentMapper contentMapper;
     @Autowired
-    private CommentMapper commentMapper;
+    private ContentService contentService;
     @Autowired
     private ModerationRecordService moderationRecordService;
-    @Autowired
-    private InteractionSnapshotService interactionSnapshotService;
     @Autowired
     private UserCreditService userCreditService;
 
@@ -62,7 +59,7 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
                     CampusBizCodeEnum.APPEAL_NOT_ELIGIBLE.getCode());
         }
 
-        // 检查是否已有待审或已通过的申诉
+        // 检查是否已有待审或已通过的申诉（幂等防重复）
         Long existingCount = appealMapper.selectPendingOrApprovedCount(contentId);
         if (existingCount > 0) {
             throw new ServiceException(CampusBizCodeEnum.APPEAL_ALREADY_EXISTS.getMsg(),
@@ -87,56 +84,40 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
             throw new ServiceException("申诉不存在");
         }
 
+        // 幂等校验：必须是待审状态(0)
         if (appeal.getAppealStatus() != 0) {
-            throw new ServiceException("该申诉已处理");
+            throw new ServiceException("该申诉已处理，不可重复操作");
         }
 
-        // 更新申诉状态
+        // 更新申诉状态（@Transactional 保证原子性）
         appeal.setAppealStatus(decision);
         appeal.setAdminId(SecurityUtils.getUserId());
         appeal.setReviewComment(reviewComment);
         appeal.setReviewTime(new Date());
-
         try {
             appeal.setAdminName(SecurityUtils.getLoginUser().getUser().getNickName());
         } catch (Exception e) {
             // ignore if can't get name
         }
-
         int rows = appealMapper.updateById(appeal);
 
         if (decision == 1) {
-            // 申诉通过：恢复内容、解冻评论、恢复互动数据
-            ContentEntity content = contentMapper.selectById(appeal.getContentId());
-            if (content != null) {
-                Integer beforeStatus = content.getStatus();
+            // 申诉通过：统一恢复内容、评论、附件、互动数据
+            contentService.restoreContent(appeal.getContentId(),
+                    "申诉通过: " + reviewComment, "APPEAL");
 
-                // 恢复内容状态为正常
-                content.setStatus(1);
+            // 信用分回补（幂等：changeCredit 内部检查是否已回补）
+            userCreditService.changeCredit(appeal.getUserId(), 5,
+                    "申诉通过，信用分回补", "appeal", appealId);
 
-                // 从快照恢复点赞数
-                InteractionSnapshotEntity snapshot = interactionSnapshotService.getLatestSnapshot(appeal.getContentId());
-                if (snapshot != null && snapshot.getLoveCount() != null) {
-                    content.setLoveCount(snapshot.getLoveCount());
-                }
-
-                contentMapper.updateById(content);
-
-                // 解冻评论
-                unfreezeByContentId(appeal.getContentId());
-
-                // 记录审核操作
-                moderationRecordService.recordAction(
-                        appeal.getContentId(), "CONTENT", null,
-                        "MANUAL", "RESTORE", "申诉通过: " + reviewComment,
-                        null, beforeStatus, 1);
-
-                // 信用分回补
-                userCreditService.changeCredit(appeal.getUserId(), 5,
-                        "申诉通过，信用分回补", "appeal", appealId);
-            }
+            // 记录信用分回补的审核日志
+            moderationRecordService.recordAction(
+                    appeal.getContentId(), "CREDIT", appeal.getUserId(),
+                    "APPEAL", "CREDIT_RESTORE",
+                    "申诉通过信用分回补+5, appealId=" + appealId,
+                    null, null, null);
         }
-        // 如果拒绝(decision=2)，不做任何内容操作，终局
+        // 如果拒绝(decision=2)，不做任何内容恢复操作，终局
 
         return rows;
     }
@@ -154,16 +135,5 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
     @Override
     public List<AppealEntity> getMyAppeals() {
         return appealMapper.selectByUserId(SecurityUtils.getUserId());
-    }
-
-    /**
-     * 解冻内容下的所有评论
-     */
-    private void unfreezeByContentId(Long contentId) {
-        CommentEntity update = new CommentEntity();
-        update.setFrozenStatus(0);
-        commentMapper.update(update, new LambdaQueryWrapperX<CommentEntity>()
-                .eq(CommentEntity::getContentId, contentId)
-                .eq(CommentEntity::getFrozenStatus, 1));
     }
 }

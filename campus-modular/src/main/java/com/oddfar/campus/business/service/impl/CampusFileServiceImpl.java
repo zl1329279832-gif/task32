@@ -8,6 +8,7 @@ import com.oddfar.campus.business.domain.vo.CampusFileVo;
 import com.oddfar.campus.business.enums.CampusBizCodeEnum;
 import com.oddfar.campus.business.mapper.CampusFileMapper;
 import com.oddfar.campus.business.service.CampusFileService;
+import com.oddfar.campus.business.service.ModerationRecordService;
 import com.oddfar.campus.common.core.LambdaQueryWrapperX;
 import com.oddfar.campus.common.exception.ServiceException;
 import com.oddfar.campus.common.exception.file.FileSizeLimitExceededException;
@@ -52,6 +53,8 @@ public class CampusFileServiceImpl extends ServiceImpl<CampusFileMapper, CampusF
 
     @Autowired
     private CampusFileMapper campusFileMapper;
+    @Autowired
+    private ModerationRecordService moderationRecordService;
 
     @Override
     public List<CampusFileVo> getContentFile(List<Long> contentId) {
@@ -181,9 +184,25 @@ public class CampusFileServiceImpl extends ServiceImpl<CampusFileMapper, CampusF
         if (entity == null) {
             throw new ServiceException("文件不存在");
         }
+
+        // 幂等：已经是违规状态则跳过
+        if (entity.getViolationStatus() != null && entity.getViolationStatus() == 1) {
+            return 0;
+        }
+
+        Integer beforeStatus = entity.getViolationStatus() != null ? entity.getViolationStatus() : 0;
         entity.setViolationStatus(1);
         entity.setViolationReason(reason);
-        return campusFileMapper.updateById(entity);
+        int rows = campusFileMapper.updateById(entity);
+
+        // 记录审核操作日志
+        moderationRecordService.recordAction(
+                entity.getContentId(), "FILE", fileId,
+                "MANUAL", "BLOCK",
+                "附件违规标记: " + reason,
+                null, beforeStatus, 1);
+
+        return rows;
     }
 
     @Override
@@ -192,9 +211,24 @@ public class CampusFileServiceImpl extends ServiceImpl<CampusFileMapper, CampusF
         if (entity == null) {
             throw new ServiceException("文件不存在");
         }
+
+        // 幂等：已经是正常状态则跳过
+        if (entity.getViolationStatus() == null || entity.getViolationStatus() == 0) {
+            return 0;
+        }
+
         entity.setViolationStatus(0);
         entity.setViolationReason(null);
-        return campusFileMapper.updateById(entity);
+        int rows = campusFileMapper.updateById(entity);
+
+        // 记录审核操作日志
+        moderationRecordService.recordAction(
+                entity.getContentId(), "FILE", fileId,
+                "MANUAL", "RESTORE",
+                "附件违规清除",
+                null, 1, 0);
+
+        return rows;
     }
 }
 

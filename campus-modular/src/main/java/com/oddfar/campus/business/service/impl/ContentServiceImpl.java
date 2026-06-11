@@ -6,9 +6,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.github.pagehelper.PageInfo;
 import com.oddfar.campus.business.core.expander.CampusConfigExpander;
-import com.oddfar.campus.business.domain.entity.CategoryEntity;
-import com.oddfar.campus.business.domain.entity.ContentEntity;
-import com.oddfar.campus.business.domain.entity.ContentTagEntity;
+import com.oddfar.campus.business.domain.entity.*;
 import com.oddfar.campus.business.domain.vo.CampusFileVo;
 import com.oddfar.campus.business.domain.vo.ContentVo;
 import com.oddfar.campus.business.domain.vo.SendContentVo;
@@ -17,6 +15,7 @@ import com.oddfar.campus.business.mapper.ContentLoveMapper;
 import com.oddfar.campus.business.mapper.ContentMapper;
 import com.oddfar.campus.business.service.*;
 import com.oddfar.campus.business.enums.ModerationDecision;
+import com.oddfar.campus.common.core.LambdaQueryWrapperX;
 import com.oddfar.campus.common.core.page.PageUtils;
 import com.oddfar.campus.common.domain.PageResult;
 import com.oddfar.campus.common.exception.ServiceException;
@@ -27,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -56,6 +56,8 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
     private ModerationRecordService moderationRecordService;
     @Resource
     private InteractionSnapshotService snapshotService;
+    @Resource
+    private ViolationRecordService violationRecordService;
 
     @Override
     public PageResult<ContentVo> page(ContentEntity contentEntity) {
@@ -187,20 +189,100 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
             return;
         }
 
-        // 拍摄互动数据快照（用于申诉恢复）
-        snapshotService.takeSnapshot(contentId, "TAKEDOWN", null);
+        // 幂等：已经是下架状态则跳过，避免重复快照和冻结
+        if (contentEntity.getStatus() == 2) {
+            return;
+        }
 
-        // 冻结评论（连带冻结）
+        Integer beforeStatus = contentEntity.getStatus();
+
+        // 先拍摄互动数据快照（在冻结评论之前，保证快照包含真实的评论数）
+        InteractionSnapshotEntity snapshot = snapshotService.takeSnapshot(contentId, "TAKEDOWN", null);
+
+        // 冻结评论（连带冻结，已经是冻结状态的评论不会被重复冻结）
         commentService.freezeByContentId(contentId);
 
-        // 记录审核操作日志
-        moderationRecordService.recordAction(contentId, "CONTENT", null,
+        // 记录审核操作日志（包含快照统计信息用于审计）
+        ModerationRecordEntity record = moderationRecordService.recordAction(
+                contentId, "CONTENT", null,
                 "MANUAL", "TAKEDOWN", "管理员下架",
-                null, contentEntity.getStatus(), 2);
+                null, beforeStatus, 2);
+
+        // 回填快照统计到审核记录
+        if (snapshot != null) {
+            record.setSnapshotLoveCount(snapshot.getLoveCount());
+            record.setSnapshotCommentCount(snapshot.getCommentCount());
+            moderationRecordService.updateById(record);
+        }
 
         // 更新状态为下架
         contentEntity.setStatus(2);
         contentMapper.updateById(contentEntity);
+    }
+
+    @Override
+    @Transactional
+    public void restoreContent(Long contentId, String reason, String source) {
+        ContentEntity content = contentMapper.selectById(contentId);
+        if (content == null) {
+            throw new ServiceException("内容不存在");
+        }
+
+        // 幂等：已经是正常状态则跳过
+        if (content.getStatus() == 1) {
+            return;
+        }
+
+        // 只有下架(2)或拒绝(3)状态才能恢复
+        if (content.getStatus() != 2 && content.getStatus() != 3) {
+            throw new ServiceException("内容状态不允许恢复");
+        }
+
+        Integer beforeStatus = content.getStatus();
+        String moderationType = "APPEAL".equals(source) ? "APPEAL" : "MANUAL";
+
+        // 1. 恢复内容状态为正常
+        content.setStatus(1);
+
+        // 2. 从快照恢复点赞数（仅从 TAKEDOWN 类型的快照恢复，防止重复回补）
+        InteractionSnapshotEntity snapshot = snapshotService.getLatestSnapshot(contentId);
+        if (snapshot != null && snapshot.getLoveCount() != null) {
+            content.setLoveCount(snapshot.getLoveCount());
+        }
+
+        contentMapper.updateById(content);
+
+        // 3. 解冻评论
+        commentService.unfreezeByContentId(contentId);
+
+        // 4. 清除附件违规标记（恢复关联文件）
+        List<CampusFileEntity> files = fileService.list(
+                new LambdaQueryWrapperX<CampusFileEntity>()
+                        .eq(CampusFileEntity::getContentId, contentId)
+                        .eq(CampusFileEntity::getViolationStatus, 1));
+        for (CampusFileEntity file : files) {
+            fileService.clearViolation(file.getFileId());
+            // 记录附件违规清除的审核日志
+            moderationRecordService.recordAction(
+                    contentId, "FILE", file.getFileId(),
+                    moderationType, "RESTORE",
+                    "内容恢复连带清除附件违规: " + (reason != null ? reason : ""),
+                    null, 1, 0);
+        }
+
+        // 5. 记录内容恢复的审核操作日志
+        ModerationRecordEntity record = moderationRecordService.recordAction(
+                contentId, "CONTENT", null,
+                moderationType, "RESTORE",
+                reason != null ? reason : "",
+                null, beforeStatus, 1);
+
+        // 回填快照统计到审核记录
+        if (snapshot != null) {
+            record.setSnapshotLoveCount(snapshot.getLoveCount());
+            record.setSnapshotCommentCount(snapshot.getCommentCount());
+            moderationRecordService.updateById(record);
+        }
     }
 
     @Override

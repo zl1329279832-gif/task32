@@ -104,4 +104,14 @@ public interface ContentService extends IService<ContentEntity> {
      * @return
      */
     boolean checkOwnContent(Long contentId);
+
+    /**
+     * 统一恢复内容：恢复状态、解冻评论、清除附件违规、从快照恢复点赞统计、记录审核日志。
+     * 幂等设计：若内容已经是正常状态(1)则跳过，不会重复回补。
+     *
+     * @param contentId 内容id
+     * @param reason    恢复原因（用于审核日志）
+     * @param source    来源标识：APPEAL / ADMIN_RESTORE
+     */
+    void restoreContent(Long contentId, String reason, String source);
 }

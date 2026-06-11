@@ -1,11 +1,9 @@
 package com.oddfar.campus.business.controller.admin;
 
 import com.oddfar.campus.business.domain.entity.ContentEntity;
-import com.oddfar.campus.business.domain.entity.InteractionSnapshotEntity;
 import com.oddfar.campus.business.domain.entity.ModerationRecordEntity;
 import com.oddfar.campus.business.domain.vo.BatchReviewVo;
 import com.oddfar.campus.business.enums.CampusBizCodeEnum;
-import com.oddfar.campus.business.enums.ModerationDecision;
 import com.oddfar.campus.business.service.*;
 import com.oddfar.campus.common.annotation.ApiResource;
 import com.oddfar.campus.common.domain.R;
@@ -34,8 +32,6 @@ public class GovernanceModerationController {
     @Autowired
     private ModerationRecordService moderationRecordService;
     @Autowired
-    private InteractionSnapshotService snapshotService;
-    @Autowired
     private UserCreditService userCreditService;
     @Autowired
     private AdminModerationScopeService scopeService;
@@ -51,14 +47,10 @@ public class GovernanceModerationController {
             checkScope(adminUserId, contentId);
             ContentEntity content = contentService.getById(contentId);
             if (content != null && content.getStatus() == 0) {
-                Integer beforeStatus = content.getStatus();
-                content.setStatus(1);
-                contentService.updateById(content);
-                // 解冻评论
-                commentService.unfreezeByContentId(contentId);
-                // 记录审核
-                moderationRecordService.recordAction(contentId, "CONTENT", null,
-                        "MANUAL", "PASS", vo.getReason(), null, beforeStatus, 1);
+                // 使用统一恢复方法（包含解冻评论、清除附件违规、记录审核）
+                contentService.restoreContent(contentId,
+                        vo.getReason() != null ? vo.getReason() : "管理员批量审核通过",
+                        "ADMIN_RESTORE");
             }
         }
         return R.ok();
@@ -75,16 +67,13 @@ public class GovernanceModerationController {
             checkScope(adminUserId, contentId);
             ContentEntity content = contentService.getById(contentId);
             if (content != null && content.getStatus() == 0) {
-                Integer beforeStatus = content.getStatus();
-                // 快照
-                snapshotService.takeSnapshot(contentId, "REJECT", null);
-                // 冻结评论
-                commentService.freezeByContentId(contentId);
+                // 使用统一下架方法（包含快照、冻结评论、记录审核、幂等保护）
+                contentService.deleteContentById(contentId);
+
+                // 更新状态为拒绝(3)而不是下架(2)，区分审核拒绝和管理员下架
                 content.setStatus(3);
                 contentService.updateById(content);
-                // 记录审核
-                moderationRecordService.recordAction(contentId, "CONTENT", null,
-                        "MANUAL", "BLOCK", vo.getReason(), null, beforeStatus, 3);
+
                 // 扣分
                 userCreditService.changeCredit(content.getUserId(), -5,
                         "内容审核拒绝", "content", contentId);
@@ -105,32 +94,15 @@ public class GovernanceModerationController {
     }
 
     /**
-     * 恢复内容
+     * 恢复内容（统一恢复：内容状态、评论解冻、附件违规清除、点赞统计回补）
      */
     @PreAuthorize("@ss.resourceAuth()")
     @PutMapping(value = "/restore", name = "恢复内容")
     public R restore(@RequestParam Long contentId, @RequestParam(required = false) String reason) {
         checkScope(SecurityUtils.getUserId(), contentId);
-        ContentEntity content = contentService.getById(contentId);
-        if (content != null && (content.getStatus() == 2 || content.getStatus() == 3)) {
-            Integer beforeStatus = content.getStatus();
-
-            // 恢复内容状态
-            content.setStatus(1);
-            // 从快照恢复点赞数
-            InteractionSnapshotEntity snapshot = snapshotService.getLatestSnapshot(contentId);
-            if (snapshot != null && snapshot.getLoveCount() != null) {
-                content.setLoveCount(snapshot.getLoveCount());
-            }
-            contentService.updateById(content);
-
-            // 解冻评论
-            commentService.unfreezeByContentId(contentId);
-
-            // 记录审核
-            moderationRecordService.recordAction(contentId, "CONTENT", null,
-                    "MANUAL", "RESTORE", reason, null, beforeStatus, 1);
-        }
+        contentService.restoreContent(contentId,
+                reason != null ? reason : "管理员手动恢复",
+                "ADMIN_RESTORE");
         return R.ok();
     }
 

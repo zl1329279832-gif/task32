@@ -7,6 +7,7 @@ import com.oddfar.campus.business.domain.entity.UserCreditEntity;
 import com.oddfar.campus.business.mapper.CreditLogMapper;
 import com.oddfar.campus.business.mapper.UserCreditMapper;
 import com.oddfar.campus.business.service.UserCreditService;
+import com.oddfar.campus.common.core.LambdaQueryWrapperX;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +44,19 @@ public class UserCreditServiceImpl extends ServiceImpl<UserCreditMapper, UserCre
     @Override
     @Transactional
     public void changeCredit(Long userId, int delta, String reason, String relatedType, Long relatedId) {
+        // 幂等校验：同一 (relatedType, relatedId) 只允许一次变更
+        // 防止申诉通过时重复回补信用分
+        if (relatedType != null && relatedId != null) {
+            Long existCount = creditLogMapper.selectCount(
+                    new LambdaQueryWrapperX<CreditLogEntity>()
+                            .eq(CreditLogEntity::getRelatedType, relatedType)
+                            .eq(CreditLogEntity::getRelatedId, relatedId));
+            if (existCount != null && existCount > 0) {
+                // 已经存在变更记录，幂等跳过
+                return;
+            }
+        }
+
         UserCreditEntity entity = userCreditMapper.selectByUserId(userId);
         if (entity == null) {
             entity = new UserCreditEntity();
