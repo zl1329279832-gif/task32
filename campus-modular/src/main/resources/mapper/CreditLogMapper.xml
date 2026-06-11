@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.oddfar.campus.business.mapper.CreditLogMapper">
+
+    <select id="selectByUserId" resultType="com.oddfar.campus.business.domain.entity.CreditLogEntity">
+        SELECT log_id, user_id, change_value, reason, related_type, related_id, create_time
+        FROM campus_credit_log
+        WHERE user_id = #{userId}
+        ORDER BY create_time DESC
+    </select>
+
+</mapper>

@@ -89,4 +89,20 @@ public interface CommentService extends IService<CommentEntity> {
      */
     int delOwnComment(Long commentId);
 
+    /**
+     * 冻结某内容下的所有评论
+     *
+     * @param contentId 内容id
+     * @return 影响行数
+     */
+    int freezeByContentId(Long contentId);
+
+    /**
+     * 解冻某内容下的所有评论
+     *
+     * @param contentId 内容id
+     * @return 影响行数
+     */
+    int unfreezeByContentId(Long contentId);
+
 }

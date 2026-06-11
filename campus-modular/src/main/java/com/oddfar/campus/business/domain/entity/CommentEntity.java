@@ -63,4 +63,9 @@ public class CommentEntity extends BaseEntity {
      */
     private String address;
 
+    /**
+     * 冻结状态：0=正常, 1=冻结(父内容被下架)
+     */
+    private Integer frozenStatus;
+
 }

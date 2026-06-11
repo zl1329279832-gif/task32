@@ -61,4 +61,21 @@ public interface CampusFileService extends IService<CampusFileEntity> {
      * 删除信息墙没分配的文件
      */
     void removeCampusFile();
+
+    /**
+     * 标记附件违规
+     *
+     * @param fileId    文件id
+     * @param reason    违规原因
+     * @return 影响行数
+     */
+    int flagViolation(Long fileId, String reason);
+
+    /**
+     * 清除附件违规标记
+     *
+     * @param fileId 文件id
+     * @return 影响行数
+     */
+    int clearViolation(Long fileId);
 }

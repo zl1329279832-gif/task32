@@ -8,7 +8,10 @@ import com.oddfar.campus.business.domain.vo.CommentVo;
 import com.oddfar.campus.business.enums.CampusBizCodeEnum;
 import com.oddfar.campus.business.mapper.CommentMapper;
 import com.oddfar.campus.business.mapper.ContentMapper;
+import com.oddfar.campus.business.service.AutoModerationService;
 import com.oddfar.campus.business.service.CommentService;
+import com.oddfar.campus.business.enums.ModerationDecision;
+import com.oddfar.campus.common.core.LambdaQueryWrapperX;
 import com.oddfar.campus.common.core.page.PageUtils;
 import com.oddfar.campus.common.domain.PageResult;
 import com.oddfar.campus.common.exception.ServiceException;
@@ -33,6 +36,8 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, CommentEntity
     private CommentMapper commentMapper;
     @Autowired
     private ContentMapper contentMapper;
+    @Autowired
+    private AutoModerationService autoModerationService;
 
     @Override
     public PageResult<CommentEntity> page(CommentEntity comment) {
@@ -127,6 +132,13 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, CommentEntity
                         CampusBizCodeEnum.CONTENT_OPERATION_PROHIBITED.getCode());
             }
 
+            // 自动审核评论内容
+            ModerationDecision commentDecision = autoModerationService.evaluateComment(comment);
+            if (commentDecision == ModerationDecision.BLOCK) {
+                throw new ServiceException(CampusBizCodeEnum.COMMENT_BLOCKED.getMsg(),
+                        CampusBizCodeEnum.COMMENT_BLOCKED.getCode());
+            }
+
         } else {
             //给评论添加评论
             CommentEntity commentEntity = commentMapper.selectById(comment.getCommentId());
@@ -179,6 +191,24 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, CommentEntity
             }
         });
 
+    }
+
+    @Override
+    public int freezeByContentId(Long contentId) {
+        CommentEntity update = new CommentEntity();
+        update.setFrozenStatus(1);
+        return commentMapper.update(update, new LambdaQueryWrapperX<CommentEntity>()
+                .eq(CommentEntity::getContentId, contentId)
+                .eq(CommentEntity::getFrozenStatus, 0));
+    }
+
+    @Override
+    public int unfreezeByContentId(Long contentId) {
+        CommentEntity update = new CommentEntity();
+        update.setFrozenStatus(0);
+        return commentMapper.update(update, new LambdaQueryWrapperX<CommentEntity>()
+                .eq(CommentEntity::getContentId, contentId)
+                .eq(CommentEntity::getFrozenStatus, 1));
     }
 }
 

@@ -174,6 +174,28 @@ public class CampusFileServiceImpl extends ServiceImpl<CampusFileMapper, CampusF
         campusFileMapper.insert(campusFileEntity);
         return campusFileEntity;
     }
+
+    @Override
+    public int flagViolation(Long fileId, String reason) {
+        CampusFileEntity entity = campusFileMapper.selectById(fileId);
+        if (entity == null) {
+            throw new ServiceException("文件不存在");
+        }
+        entity.setViolationStatus(1);
+        entity.setViolationReason(reason);
+        return campusFileMapper.updateById(entity);
+    }
+
+    @Override
+    public int clearViolation(Long fileId) {
+        CampusFileEntity entity = campusFileMapper.selectById(fileId);
+        if (entity == null) {
+            throw new ServiceException("文件不存在");
+        }
+        entity.setViolationStatus(0);
+        entity.setViolationReason(null);
+        return campusFileMapper.updateById(entity);
+    }
 }
 
 

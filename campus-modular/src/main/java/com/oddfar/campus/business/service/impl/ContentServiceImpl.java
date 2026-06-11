@@ -15,10 +15,8 @@ import com.oddfar.campus.business.domain.vo.SendContentVo;
 import com.oddfar.campus.business.enums.CampusBizCodeEnum;
 import com.oddfar.campus.business.mapper.ContentLoveMapper;
 import com.oddfar.campus.business.mapper.ContentMapper;
-import com.oddfar.campus.business.service.CampusFileService;
-import com.oddfar.campus.business.service.CategoryService;
-import com.oddfar.campus.business.service.ContentService;
-import com.oddfar.campus.business.service.TagService;
+import com.oddfar.campus.business.service.*;
+import com.oddfar.campus.business.enums.ModerationDecision;
 import com.oddfar.campus.common.core.page.PageUtils;
 import com.oddfar.campus.common.domain.PageResult;
 import com.oddfar.campus.common.exception.ServiceException;
@@ -50,6 +48,14 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
     private CampusFileService fileService;
     @Resource
     private TagService tagService;
+    @Resource
+    private AutoModerationService autoModerationService;
+    @Resource
+    private CommentService commentService;
+    @Resource
+    private ModerationRecordService moderationRecordService;
+    @Resource
+    private InteractionSnapshotService snapshotService;
 
     @Override
     public PageResult<ContentVo> page(ContentEntity contentEntity) {
@@ -141,7 +147,13 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
         }
 
         contentEntity.setContentId(IdWorker.getId());
-        contentEntity.setStatus(0);
+
+        // 自动审核：根据分类、标签、敏感词、信用分、违规历史等综合判断
+        List<String> tagNames = new ArrayList<>();
+        ModerationDecision decision = autoModerationService.evaluate(
+                contentEntity, sendContentVo.getFileList(), tagNames);
+        contentEntity.setStatus(decision.toStatus());
+
         int insert = contentMapper.insert(contentEntity);
         //更新文件数据库
         fileService.updateContentFile(sendContentVo.getFileList(), contentEntity.getContentId());
@@ -168,18 +180,27 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
     }
 
     @Override
+    @Transactional
     public void deleteContentById(Long contentId) {
         ContentEntity contentEntity = contentMapper.selectById(contentId);
         if (contentEntity == null) {
             return;
         }
-        //TODO 删除信息墙的处理
-        //删除评论
 
-        //墙的文件处理
+        // 拍摄互动数据快照（用于申诉恢复）
+        snapshotService.takeSnapshot(contentId, "TAKEDOWN", null);
 
-        //删除墙
-        contentMapper.deleteById(contentId);
+        // 冻结评论（连带冻结）
+        commentService.freezeByContentId(contentId);
+
+        // 记录审核操作日志
+        moderationRecordService.recordAction(contentId, "CONTENT", null,
+                "MANUAL", "TAKEDOWN", "管理员下架",
+                null, contentEntity.getStatus(), 2);
+
+        // 更新状态为下架
+        contentEntity.setStatus(2);
+        contentMapper.updateById(contentEntity);
     }
 
     @Override

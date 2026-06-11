@@ -43,18 +43,30 @@ public enum CampusBizCodeEnum {
     CONTENT_FILE_COUNT_EXCEPTION(12005,"信息墙文件数量异常"),
     CONTENT_FILE_EXCEPTION(12006,"信息墙文件异常"),
     CONTENT_NOT_YOU(12007,"这不是你的信息墙"),
+    CONTENT_BLOCKED_AUTO(12008,"内容被自动审核拦截"),
+    APPEAL_ALREADY_EXISTS(12009,"该内容已有申诉，请勿重复提交"),
+    APPEAL_NOT_OWNER(12010,"只能申诉自己的内容"),
+    APPEAL_NOT_ELIGIBLE(12011,"该内容不符合申诉条件"),
+    MODERATION_SCOPE_DENIED(12012,"无权审核该内容"),
 
     /**
      * 用户
      */
     NOT_LOGGED_IN(11001,"请登录后操作"),
     EMAIL_NOT_EXIST(11002,"邮箱不存在"),
+    CREDIT_TOO_LOW(11003,"信用分过低"),
 
     /**
      * 评论
      */
     COMMENT_IS_NULL(13001,"评论不存在"),
     COMMENT_DEL_ERR(13002,"评论删除失败"),
+    COMMENT_BLOCKED(13003,"评论包含违规内容，已被拦截"),
+
+    /**
+     * 附件
+     */
+    FILE_VIOLATION(10006,"附件被标记为违规"),
 
 
     SMS_SEND_CODE_EXCEPTION(10403, "短信发送失败"),
