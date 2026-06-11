@@ -14,7 +14,12 @@ public interface InteractionSnapshotService extends IService<InteractionSnapshot
     InteractionSnapshotEntity takeSnapshot(Long contentId, String snapshotType, Long moderationRecordId);
 
     /**
-     * 获取某内容最新的快照
+     * 获取某内容最新的未消费快照
      */
     InteractionSnapshotEntity getLatestSnapshot(Long contentId);
+
+    /**
+     * 标记快照为已消费（防止重复回补点赞数）
+     */
+    void markConsumed(Long snapshotId);
 }

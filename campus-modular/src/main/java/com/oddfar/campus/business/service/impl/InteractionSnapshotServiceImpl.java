@@ -58,4 +58,13 @@ public class InteractionSnapshotServiceImpl extends ServiceImpl<InteractionSnaps
     public InteractionSnapshotEntity getLatestSnapshot(Long contentId) {
         return interactionSnapshotMapper.selectLatestByContentId(contentId);
     }
+
+    @Override
+    public void markConsumed(Long snapshotId) {
+        InteractionSnapshotEntity snapshot = interactionSnapshotMapper.selectById(snapshotId);
+        if (snapshot != null && (snapshot.getConsumed() == null || snapshot.getConsumed() == 0)) {
+            snapshot.setConsumed(1);
+            interactionSnapshotMapper.updateById(snapshot);
+        }
+    }
 }

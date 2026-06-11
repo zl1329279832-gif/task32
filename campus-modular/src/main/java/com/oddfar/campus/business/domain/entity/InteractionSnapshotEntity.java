@@ -33,6 +33,9 @@ public class InteractionSnapshotEntity {
     /** 关联审核记录id */
     private Long moderationRecordId;
 
+    /** 是否已消费（用于防止重复回补）：0=未消费, 1=已消费 */
+    private Integer consumed;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date createTime;
 

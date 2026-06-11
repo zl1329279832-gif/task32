@@ -8,7 +8,6 @@ import com.oddfar.campus.business.mapper.ContentLoveMapper;
 import com.oddfar.campus.business.mapper.ContentMapper;
 import com.oddfar.campus.business.service.*;
 import com.oddfar.campus.business.service.impl.ContentServiceImpl;
-import com.oddfar.campus.common.core.LambdaQueryWrapperX;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -64,7 +63,6 @@ public class CommentFreezeCascadeTest extends BaseTest {
         when(contentMapper.selectById(1001L)).thenReturn(content);
         when(contentMapper.updateById(any(ContentEntity.class))).thenReturn(1);
 
-        // 调用deleteContentById（已改为下架逻辑）
         contentService.deleteContentById(1001L);
 
         // 验证快照被拍摄
@@ -79,6 +77,27 @@ public class CommentFreezeCascadeTest extends BaseTest {
     }
 
     /**
+     * 二次下架已下架内容应幂等跳过
+     */
+    @Test
+    void doubleTakedownShouldBeIdempotent() {
+        ContentEntity content = createContent(1001L, 100L, 1L, "已下架内容", 2, 0);
+        when(contentMapper.selectById(1001L)).thenReturn(content);
+
+        contentService.deleteContentById(1001L);
+
+        // 不应创建重复快照
+        verify(snapshotService, never()).takeSnapshot(anyLong(), anyString(), any());
+        // 不应重复冻结评论
+        verify(commentService, never()).freezeByContentId(anyLong());
+        // 不应写入重复审核记录
+        verify(moderationRecordService, never()).recordAction(anyLong(), anyString(), any(),
+                anyString(), anyString(), anyString(), any(), any(), any());
+        // 状态不变
+        assertEquals(2, content.getStatus());
+    }
+
+    /**
      * 冻结的评论字段状态正确
      */
     @Test
@@ -86,12 +105,9 @@ public class CommentFreezeCascadeTest extends BaseTest {
         CommentEntity comment = createComment(2001L, 1001L, 101L, "测试评论");
         assertEquals(0, comment.getFrozenStatus());
 
-        // 冻结后
         comment.setFrozenStatus(1);
         assertEquals(1, comment.getFrozenStatus());
 
-        // CommentMapper.xml已添加 frozen_status = 0 条件
-        // 验证字段正确设置
         assertNotNull(comment.getFrozenStatus());
     }
 
@@ -100,7 +116,6 @@ public class CommentFreezeCascadeTest extends BaseTest {
      */
     @Test
     void appealApprovalShouldUnfreezeComments() {
-        // 验证CommentService接口有unfreezeByContentId方法
         commentService.unfreezeByContentId(1001L);
         verify(commentService).unfreezeByContentId(1001L);
     }

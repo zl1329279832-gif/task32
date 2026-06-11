@@ -38,6 +38,10 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
     private InteractionSnapshotService interactionSnapshotService;
     @Autowired
     private UserCreditService userCreditService;
+    @Autowired
+    private CampusFileService campusFileService;
+    @Autowired
+    private CommentService commentService;
 
     @Override
     public int submitAppeal(Long contentId, String reason) {
@@ -105,25 +109,30 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
 
         int rows = appealMapper.updateById(appeal);
 
+        ContentEntity content = contentMapper.selectById(appeal.getContentId());
+
         if (decision == 1) {
-            // 申诉通过：恢复内容、解冻评论、恢复互动数据
-            ContentEntity content = contentMapper.selectById(appeal.getContentId());
+            // 申诉通过：恢复内容、解冻评论、清除附件违规、恢复互动数据
             if (content != null) {
                 Integer beforeStatus = content.getStatus();
 
                 // 恢复内容状态为正常
                 content.setStatus(1);
 
-                // 从快照恢复点赞数
+                // 从快照恢复点赞数（标记快照已消费防止重复回补）
                 InteractionSnapshotEntity snapshot = interactionSnapshotService.getLatestSnapshot(appeal.getContentId());
                 if (snapshot != null && snapshot.getLoveCount() != null) {
                     content.setLoveCount(snapshot.getLoveCount());
+                    interactionSnapshotService.markConsumed(snapshot.getSnapshotId());
                 }
 
                 contentMapper.updateById(content);
 
                 // 解冻评论
-                unfreezeByContentId(appeal.getContentId());
+                commentService.unfreezeByContentId(appeal.getContentId());
+
+                // 清除附件违规标记
+                campusFileService.clearViolationByContentId(appeal.getContentId());
 
                 // 记录审核操作
                 moderationRecordService.recordAction(
@@ -131,12 +140,18 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
                         "MANUAL", "RESTORE", "申诉通过: " + reviewComment,
                         null, beforeStatus, 1);
 
-                // 信用分回补
+                // 信用分回补（幂等：changeCredit内部会检查重复）
                 userCreditService.changeCredit(appeal.getUserId(), 5,
                         "申诉通过，信用分回补", "appeal", appealId);
             }
+        } else if (decision == 2) {
+            // 申诉驳回：记录审核操作留审计痕迹
+            Integer contentStatus = content != null ? content.getStatus() : null;
+            moderationRecordService.recordAction(
+                    appeal.getContentId(), "CONTENT", null,
+                    "MANUAL", "APPEAL_REJECT", "申诉驳回: " + reviewComment,
+                    null, contentStatus, contentStatus);
         }
-        // 如果拒绝(decision=2)，不做任何内容操作，终局
 
         return rows;
     }
@@ -154,16 +169,5 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
     @Override
     public List<AppealEntity> getMyAppeals() {
         return appealMapper.selectByUserId(SecurityUtils.getUserId());
-    }
-
-    /**
-     * 解冻内容下的所有评论
-     */
-    private void unfreezeByContentId(Long contentId) {
-        CommentEntity update = new CommentEntity();
-        update.setFrozenStatus(0);
-        commentMapper.update(update, new LambdaQueryWrapperX<CommentEntity>()
-                .eq(CommentEntity::getContentId, contentId)
-                .eq(CommentEntity::getFrozenStatus, 1));
     }
 }

@@ -118,6 +118,7 @@ CREATE TABLE IF NOT EXISTS `campus_interaction_snapshot` (
   `comment_count`        bigint      DEFAULT 0,
   `snapshot_type`        varchar(20) DEFAULT 'TAKEDOWN' COMMENT 'TAKEDOWN/REJECT',
   `moderation_record_id` bigint      DEFAULT NULL,
+  `consumed`             tinyint     DEFAULT 0 COMMENT '0=未消费, 1=已消费（防止重复回补）',
   `del_flag`             bit(1)      DEFAULT b'0',
   `create_time`          datetime    DEFAULT CURRENT_TIMESTAMP,
   `create_user`          bigint      DEFAULT NULL,

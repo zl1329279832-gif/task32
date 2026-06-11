@@ -43,6 +43,12 @@ public class UserCreditServiceImpl extends ServiceImpl<UserCreditMapper, UserCre
     @Override
     @Transactional
     public void changeCredit(Long userId, int delta, String reason, String relatedType, Long relatedId) {
+        // 幂等检查：同一关联类型+关联id不重复变更
+        if (relatedType != null && relatedId != null
+                && creditLogMapper.existsByRelated(userId, relatedType, relatedId)) {
+            return;
+        }
+
         UserCreditEntity entity = userCreditMapper.selectByUserId(userId);
         if (entity == null) {
             entity = new UserCreditEntity();

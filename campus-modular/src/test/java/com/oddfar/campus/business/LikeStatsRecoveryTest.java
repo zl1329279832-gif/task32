@@ -38,7 +38,6 @@ public class LikeStatsRecoveryTest extends BaseTest {
      */
     @Test
     void loveCountRecoveredAfterAppeal() {
-        // 1. 模拟下架时拍摄快照
         ContentEntity content = createContent(1001L, 100L, 1L, "测试内容", 1, 0);
         content.setLoveCount(15L);
 
@@ -53,7 +52,6 @@ public class LikeStatsRecoveryTest extends BaseTest {
         assertEquals(8L, snapshot.getCommentCount());
         assertEquals("TAKEDOWN", snapshot.getSnapshotType());
 
-        // 2. 模拟申诉通过后恢复
         when(interactionSnapshotMapper.selectLatestByContentId(1001L)).thenReturn(snapshot);
 
         InteractionSnapshotEntity restored = snapshotService.getLatestSnapshot(1001L);
@@ -78,5 +76,58 @@ public class LikeStatsRecoveryTest extends BaseTest {
         assertNotNull(snapshot);
         assertEquals(12L, snapshot.getCommentCount());
         assertEquals(1001L, snapshot.getContentId());
+    }
+
+    /**
+     * 标记快照为已消费后不会被重复获取
+     */
+    @Test
+    void consumedSnapshotPreventsDoubleBackfill() {
+        InteractionSnapshotEntity snapshot = new InteractionSnapshotEntity();
+        snapshot.setSnapshotId(8001L);
+        snapshot.setContentId(1001L);
+        snapshot.setLoveCount(15L);
+        snapshot.setConsumed(0);
+
+        when(interactionSnapshotMapper.selectById(8001L)).thenReturn(snapshot);
+        when(interactionSnapshotMapper.updateById(any(InteractionSnapshotEntity.class))).thenReturn(1);
+
+        // 标记消费
+        snapshotService.markConsumed(8001L);
+
+        assertEquals(1, snapshot.getConsumed());
+        verify(interactionSnapshotMapper).updateById(argThat(s ->
+                s.getSnapshotId().equals(8001L) && s.getConsumed() == 1));
+    }
+
+    /**
+     * 重复标记消费应幂等
+     */
+    @Test
+    void markConsumedIsIdempotent() {
+        InteractionSnapshotEntity snapshot = new InteractionSnapshotEntity();
+        snapshot.setSnapshotId(8002L);
+        snapshot.setContentId(1001L);
+        snapshot.setLoveCount(10L);
+        snapshot.setConsumed(1); // 已消费
+
+        when(interactionSnapshotMapper.selectById(8002L)).thenReturn(snapshot);
+
+        snapshotService.markConsumed(8002L);
+
+        // 不应更新已消费的快照
+        verify(interactionSnapshotMapper, never()).updateById(any());
+    }
+
+    /**
+     * 标记不存在的快照消费应安全跳过
+     */
+    @Test
+    void markConsumedNonexistentSnapshotShouldSkip() {
+        when(interactionSnapshotMapper.selectById(9999L)).thenReturn(null);
+
+        snapshotService.markConsumed(9999L);
+
+        verify(interactionSnapshotMapper, never()).updateById(any());
     }
 }

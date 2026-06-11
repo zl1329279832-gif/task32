@@ -78,4 +78,12 @@ public interface CampusFileService extends IService<CampusFileEntity> {
      * @return 影响行数
      */
     int clearViolation(Long fileId);
+
+    /**
+     * 批量清除某内容下所有附件的违规标记
+     *
+     * @param contentId 内容id
+     * @return 影响行数
+     */
+    int clearViolationByContentId(Long contentId);
 }

@@ -39,6 +39,8 @@ public class GovernanceModerationController {
     private UserCreditService userCreditService;
     @Autowired
     private AdminModerationScopeService scopeService;
+    @Autowired
+    private CampusFileService campusFileService;
 
     /**
      * 批量审核通过
@@ -117,15 +119,19 @@ public class GovernanceModerationController {
 
             // 恢复内容状态
             content.setStatus(1);
-            // 从快照恢复点赞数
+            // 从快照恢复点赞数（标记快照已消费防止重复回补）
             InteractionSnapshotEntity snapshot = snapshotService.getLatestSnapshot(contentId);
             if (snapshot != null && snapshot.getLoveCount() != null) {
                 content.setLoveCount(snapshot.getLoveCount());
+                snapshotService.markConsumed(snapshot.getSnapshotId());
             }
             contentService.updateById(content);
 
             // 解冻评论
             commentService.unfreezeByContentId(contentId);
+
+            // 清除附件违规标记
+            campusFileService.clearViolationByContentId(contentId);
 
             // 记录审核
             moderationRecordService.recordAction(contentId, "CONTENT", null,

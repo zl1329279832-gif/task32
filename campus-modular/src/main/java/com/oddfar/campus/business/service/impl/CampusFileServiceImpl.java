@@ -196,6 +196,16 @@ public class CampusFileServiceImpl extends ServiceImpl<CampusFileMapper, CampusF
         entity.setViolationReason(null);
         return campusFileMapper.updateById(entity);
     }
+
+    @Override
+    public int clearViolationByContentId(Long contentId) {
+        CampusFileEntity update = new CampusFileEntity();
+        update.setViolationStatus(0);
+        update.setViolationReason(null);
+        return campusFileMapper.update(update, new LambdaQueryWrapperX<CampusFileEntity>()
+                .eq(CampusFileEntity::getContentId, contentId)
+                .eq(CampusFileEntity::getViolationStatus, 1));
+    }
 }
 
 

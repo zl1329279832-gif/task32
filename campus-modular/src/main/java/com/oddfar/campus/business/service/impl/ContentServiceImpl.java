@@ -187,6 +187,11 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
             return;
         }
 
+        // 幂等：已下架的内容不重复操作
+        if (contentEntity.getStatus() == 2) {
+            return;
+        }
+
         // 拍摄互动数据快照（用于申诉恢复）
         snapshotService.takeSnapshot(contentId, "TAKEDOWN", null);
 

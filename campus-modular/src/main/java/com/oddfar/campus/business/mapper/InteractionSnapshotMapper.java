@@ -9,11 +9,13 @@ import org.apache.ibatis.annotations.Mapper;
 public interface InteractionSnapshotMapper extends BaseMapperX<InteractionSnapshotEntity> {
 
     /**
-     * 查询某内容最新的互动快照
+     * 查询某内容最新的未消费快照
      */
     default InteractionSnapshotEntity selectLatestByContentId(Long contentId) {
         return selectOne(new LambdaQueryWrapperX<InteractionSnapshotEntity>()
                 .eq(InteractionSnapshotEntity::getContentId, contentId)
+                .and(w -> w.eq(InteractionSnapshotEntity::getConsumed, 0)
+                        .or().isNull(InteractionSnapshotEntity::getConsumed))
                 .orderByDesc(InteractionSnapshotEntity::getCreateTime)
                 .last("LIMIT 1"));
     }
