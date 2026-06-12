@@ -101,4 +101,9 @@ public class CommentVo extends PageParam {
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date createTime;
+
+    /**
+     * 只读状态：0=可编辑, 1=只读(恢复后)
+     */
+    private Integer readOnlyStatus;
 }

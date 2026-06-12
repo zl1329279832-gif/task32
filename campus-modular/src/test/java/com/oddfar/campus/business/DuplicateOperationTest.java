@@ -4,6 +4,7 @@ import com.oddfar.campus.business.domain.entity.*;
 import com.oddfar.campus.business.mapper.*;
 import com.oddfar.campus.business.service.*;
 import com.oddfar.campus.business.service.impl.ContentServiceImpl;
+import com.oddfar.campus.business.service.impl.GovernanceCacheHelper;
 import com.oddfar.campus.business.service.impl.UserCreditServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,6 +50,8 @@ public class DuplicateOperationTest extends BaseTest {
     private CategoryService categoryService;
     @Mock
     private ViolationRecordService violationRecordService;
+    @Mock
+    private GovernanceCacheHelper governanceCacheHelper;
 
     @BeforeEach
     void setUp() {
@@ -96,7 +99,7 @@ public class DuplicateOperationTest extends BaseTest {
         // 不应查询快照
         verify(snapshotService, never()).getLatestSnapshot(anyLong());
         // 不应解冻评论
-        verify(commentService, never()).unfreezeByContentId(anyLong());
+        verify(commentService, never()).unfreezeToReadOnly(anyLong());
         // 不应记录审核
         verify(moderationRecordService, never()).recordAction(anyLong(), anyString(), any(),
                 anyString(), anyString(), anyString(), any(), any(), any());
@@ -124,7 +127,7 @@ public class DuplicateOperationTest extends BaseTest {
         // 验证第一次恢复生效
         assertEquals(1, content.getStatus());
         assertEquals(15L, content.getLoveCount());
-        verify(commentService).unfreezeByContentId(1001L);
+        verify(commentService).unfreezeToReadOnly(1001L);
 
         // 第二次：内容已恢复正常(1)，应跳过
         reset(snapshotService, commentService, moderationRecordService, fileService);
@@ -134,6 +137,6 @@ public class DuplicateOperationTest extends BaseTest {
 
         // 验证第二次恢复没有执行任何操作
         verify(snapshotService, never()).getLatestSnapshot(anyLong());
-        verify(commentService, never()).unfreezeByContentId(anyLong());
+        verify(commentService, never()).unfreezeToReadOnly(anyLong());
     }
 }

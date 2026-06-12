@@ -1,11 +1,16 @@
 package com.oddfar.campus.business.controller.admin;
 
 import com.oddfar.campus.business.domain.entity.ContentEntity;
+import com.oddfar.campus.business.domain.entity.GovernanceBatchEntity;
 import com.oddfar.campus.business.domain.entity.ModerationRecordEntity;
+import com.oddfar.campus.business.domain.vo.AuditQueryVo;
 import com.oddfar.campus.business.domain.vo.BatchReviewVo;
+import com.oddfar.campus.business.domain.vo.BatchTakedownVo;
 import com.oddfar.campus.business.enums.CampusBizCodeEnum;
 import com.oddfar.campus.business.service.*;
 import com.oddfar.campus.common.annotation.ApiResource;
+import com.oddfar.campus.common.core.page.PageUtils;
+import com.oddfar.campus.common.domain.PageResult;
 import com.oddfar.campus.common.domain.R;
 import com.oddfar.campus.common.enums.ResBizTypeEnum;
 import com.oddfar.campus.common.exception.ServiceException;
@@ -35,9 +40,11 @@ public class GovernanceModerationController {
     private UserCreditService userCreditService;
     @Autowired
     private AdminModerationScopeService scopeService;
+    @Autowired
+    private GovernanceBatchService governanceBatchService;
 
     /**
-     * 批量审核通过
+     * 批量审核通过（带批次追踪）
      */
     @PreAuthorize("@ss.resourceAuth()")
     @PostMapping(value = "/batchApprove", name = "批量审核通过")
@@ -45,19 +52,24 @@ public class GovernanceModerationController {
         Long adminUserId = SecurityUtils.getUserId();
         for (Long contentId : vo.getContentIds()) {
             checkScope(adminUserId, contentId);
+        }
+
+        GovernanceBatchEntity batch = governanceBatchService.createBatch("APPROVE", vo.getContentIds(),
+                vo.getReason() != null ? vo.getReason() : "管理员批量审核通过");
+
+        for (Long contentId : vo.getContentIds()) {
             ContentEntity content = contentService.getById(contentId);
             if (content != null && content.getStatus() == 0) {
-                // 使用统一恢复方法（包含解冻评论、清除附件违规、记录审核）
                 contentService.restoreContent(contentId,
                         vo.getReason() != null ? vo.getReason() : "管理员批量审核通过",
                         "ADMIN_RESTORE");
             }
         }
-        return R.ok();
+        return R.ok(batch);
     }
 
     /**
-     * 批量审核拒绝
+     * 批量审核拒绝（带批次追踪）
      */
     @PreAuthorize("@ss.resourceAuth()")
     @PostMapping(value = "/batchReject", name = "批量审核拒绝")
@@ -65,21 +77,36 @@ public class GovernanceModerationController {
         Long adminUserId = SecurityUtils.getUserId();
         for (Long contentId : vo.getContentIds()) {
             checkScope(adminUserId, contentId);
+        }
+
+        GovernanceBatchEntity batch = governanceBatchService.createBatch("REJECT", vo.getContentIds(),
+                vo.getReason() != null ? vo.getReason() : "管理员批量审核拒绝");
+
+        for (Long contentId : vo.getContentIds()) {
             ContentEntity content = contentService.getById(contentId);
             if (content != null && content.getStatus() == 0) {
-                // 使用统一下架方法（包含快照、冻结评论、记录审核、幂等保护）
                 contentService.deleteContentById(contentId);
-
-                // 更新状态为拒绝(3)而不是下架(2)，区分审核拒绝和管理员下架
                 content.setStatus(3);
                 contentService.updateById(content);
-
-                // 扣分
                 userCreditService.changeCredit(content.getUserId(), -5,
                         "内容审核拒绝", "content", contentId);
             }
         }
-        return R.ok();
+        return R.ok(batch);
+    }
+
+    /**
+     * 批量下架（带治理批次追踪）
+     */
+    @PreAuthorize("@ss.resourceAuth()")
+    @PostMapping(value = "/batchTakedown", name = "批量下架")
+    public R batchTakedown(@Validated @RequestBody BatchTakedownVo vo) {
+        Long adminUserId = SecurityUtils.getUserId();
+        for (Long contentId : vo.getContentIds()) {
+            checkScope(adminUserId, contentId);
+        }
+        GovernanceBatchEntity batch = contentService.batchTakedown(vo.getContentIds(), vo.getReason());
+        return R.ok(batch);
     }
 
     /**
@@ -117,10 +144,35 @@ public class GovernanceModerationController {
     }
 
     /**
+     * 审计查询（支持多条件筛选+分页）
+     */
+    @PreAuthorize("@ss.resourceAuth()")
+    @GetMapping(value = "/audit", name = "审计查询")
+    public R auditQuery(AuditQueryVo vo) {
+        PageUtils.startPage();
+        PageResult<ModerationRecordEntity> result = moderationRecordService.queryAuditRecords(
+                vo.getContentId(), vo.getAdminId(), vo.getAction(),
+                vo.getTargetType(), vo.getBatchId(), vo.getStartTime(), vo.getEndTime());
+        return R.ok().put(result);
+    }
+
+    /**
+     * 批次详情
+     */
+    @PreAuthorize("@ss.resourceAuth()")
+    @GetMapping(value = "/batch/{batchId}", name = "批次详情")
+    public R batchDetail(@PathVariable Long batchId) {
+        GovernanceBatchEntity batch = governanceBatchService.getBatchById(batchId);
+        List<ModerationRecordEntity> records = moderationRecordService.getByBatchId(batchId);
+        R r = R.ok(batch);
+        r.put("records", records);
+        return r;
+    }
+
+    /**
      * 检查管理员审核范围
      */
     private void checkScope(Long adminUserId, Long contentId) {
-        // userId=1 是超级管理员
         if (adminUserId != null && adminUserId == 1L) {
             return;
         }

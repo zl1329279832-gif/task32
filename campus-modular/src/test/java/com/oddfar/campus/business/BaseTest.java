@@ -87,4 +87,46 @@ public abstract class BaseTest {
         entity.setScopeValue(scopeValue);
         return entity;
     }
+
+    /** 创建治理批次 */
+    protected GovernanceBatchEntity createBatch(Long batchId, String batchNo,
+                                                 Long adminId, String batchType, Integer contentCount) {
+        GovernanceBatchEntity entity = new GovernanceBatchEntity();
+        entity.setBatchId(batchId);
+        entity.setBatchNo(batchNo);
+        entity.setAdminId(adminId);
+        entity.setBatchType(batchType);
+        entity.setContentCount(contentCount);
+        return entity;
+    }
+
+    /** 创建信用分补偿明细 */
+    protected CreditCompensationDetailEntity createCompensationDetail(Long detailId,
+                                                                       Long appealId, Long userId,
+                                                                       String type, Integer value) {
+        CreditCompensationDetailEntity entity = new CreditCompensationDetailEntity();
+        entity.setDetailId(detailId);
+        entity.setAppealId(appealId);
+        entity.setUserId(userId);
+        entity.setCompensationType(type);
+        entity.setCompensationValue(value);
+        return entity;
+    }
+
+    /** 创建互动快照 */
+    protected InteractionSnapshotEntity createSnapshot(Long snapshotId, Long contentId,
+                                                        Long loveCount, Long commentCount) {
+        InteractionSnapshotEntity entity = new InteractionSnapshotEntity();
+        entity.setSnapshotId(snapshotId);
+        entity.setContentId(contentId);
+        entity.setLoveCount(loveCount);
+        entity.setCommentCount(commentCount);
+        entity.setRecommendCount(0L);
+        entity.setFavoriteCount(0L);
+        entity.setReportCount(0L);
+        entity.setSearchHitCount(0L);
+        entity.setSnapshotType("TAKEDOWN");
+        entity.setCreateTime(new java.util.Date());
+        return entity;
+    }
 }

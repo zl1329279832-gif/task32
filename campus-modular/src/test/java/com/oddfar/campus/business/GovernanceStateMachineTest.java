@@ -5,6 +5,7 @@ import com.oddfar.campus.business.mapper.ContentLoveMapper;
 import com.oddfar.campus.business.mapper.ContentMapper;
 import com.oddfar.campus.business.service.*;
 import com.oddfar.campus.business.service.impl.ContentServiceImpl;
+import com.oddfar.campus.business.service.impl.GovernanceCacheHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +50,8 @@ public class GovernanceStateMachineTest extends BaseTest {
     private CategoryService categoryService;
     @Mock
     private ViolationRecordService violationRecordService;
+    @Mock
+    private GovernanceCacheHelper governanceCacheHelper;
 
     @BeforeEach
     void setUp() {
@@ -104,7 +107,7 @@ public class GovernanceStateMachineTest extends BaseTest {
         // 验证恢复后状态
         assertEquals(1, content.getStatus());
         assertEquals(15L, content.getLoveCount());
-        verify(commentService).unfreezeByContentId(contentId);
+        verify(commentService).unfreezeToReadOnly(contentId);
     }
 
     /**
@@ -223,7 +226,7 @@ public class GovernanceStateMachineTest extends BaseTest {
         contentService.restoreContent(contentId, "重复恢复", "ADMIN_RESTORE");
 
         verify(snapshotService, never()).getLatestSnapshot(anyLong());
-        verify(commentService, never()).unfreezeByContentId(anyLong());
+        verify(commentService, never()).unfreezeToReadOnly(anyLong());
     }
 
     /**
@@ -270,7 +273,7 @@ public class GovernanceStateMachineTest extends BaseTest {
         // 验证完整恢复
         assertEquals(1, content.getStatus());
         assertEquals(8L, content.getLoveCount());
-        verify(commentService).unfreezeByContentId(contentId);
+        verify(commentService).unfreezeToReadOnly(contentId);
         verify(fileService).clearViolation(4001L);
     }
 

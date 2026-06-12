@@ -2,7 +2,9 @@ package com.oddfar.campus.business.controller.admin;
 
 import com.oddfar.campus.business.domain.entity.AppealEntity;
 import com.oddfar.campus.business.domain.vo.AppealReviewVo;
+import com.oddfar.campus.business.domain.vo.CreditCompensationVo;
 import com.oddfar.campus.business.service.AppealService;
+import com.oddfar.campus.business.service.CreditCompensationService;
 import com.oddfar.campus.common.annotation.ApiResource;
 import com.oddfar.campus.common.core.page.PageUtils;
 import com.oddfar.campus.common.domain.PageResult;
@@ -23,6 +25,8 @@ public class AppealManagementController {
 
     @Autowired
     private AppealService appealService;
+    @Autowired
+    private CreditCompensationService creditCompensationService;
 
     /**
      * 分页查询申诉列表
@@ -51,5 +55,15 @@ public class AppealManagementController {
     @PutMapping(value = "/review", name = "审核申诉")
     public R review(@Validated @RequestBody AppealReviewVo vo) {
         return R.ok(appealService.reviewAppeal(vo.getAppealId(), vo.getDecision(), vo.getReviewComment()));
+    }
+
+    /**
+     * 信用分补偿明细
+     */
+    @PreAuthorize("@ss.resourceAuth()")
+    @GetMapping(value = "/compensation/{appealId}", name = "信用分补偿明细")
+    public R compensationDetails(@PathVariable Long appealId) {
+        CreditCompensationVo summary = creditCompensationService.buildCompensationSummary(appealId);
+        return R.ok(summary);
     }
 }

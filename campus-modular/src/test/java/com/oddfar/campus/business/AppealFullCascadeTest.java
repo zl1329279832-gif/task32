@@ -5,6 +5,7 @@ import com.oddfar.campus.business.mapper.AppealMapper;
 import com.oddfar.campus.business.mapper.ContentMapper;
 import com.oddfar.campus.business.service.*;
 import com.oddfar.campus.business.service.impl.AppealServiceImpl;
+import com.oddfar.campus.business.service.impl.GovernanceCacheHelper;
 import com.oddfar.campus.common.exception.ServiceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,10 @@ public class AppealFullCascadeTest extends BaseTest {
     private ModerationRecordService moderationRecordService;
     @Mock
     private UserCreditService userCreditService;
+    @Mock
+    private CreditCompensationService creditCompensationService;
+    @Mock
+    private GovernanceCacheHelper governanceCacheHelper;
 
     @BeforeEach
     void setUp() {

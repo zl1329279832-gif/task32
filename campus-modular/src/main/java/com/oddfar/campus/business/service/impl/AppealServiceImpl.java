@@ -35,6 +35,10 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
     private ModerationRecordService moderationRecordService;
     @Autowired
     private UserCreditService userCreditService;
+    @Autowired
+    private CreditCompensationService creditCompensationService;
+    @Autowired
+    private GovernanceCacheHelper governanceCacheHelper;
 
     @Override
     public int submitAppeal(Long contentId, String reason) {
@@ -66,6 +70,15 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
                     CampusBizCodeEnum.APPEAL_ALREADY_EXISTS.getCode());
         }
 
+        // 查找最近一次被拒绝的申诉，用于版本追踪
+        int version = 1;
+        Long previousAppealId = null;
+        AppealEntity latestRejected = appealMapper.selectLatestRejected(contentId);
+        if (latestRejected != null) {
+            version = (latestRejected.getAppealVersion() != null ? latestRejected.getAppealVersion() : 1) + 1;
+            previousAppealId = latestRejected.getAppealId();
+        }
+
         // 创建申诉
         AppealEntity appeal = new AppealEntity();
         appeal.setAppealId(IdWorker.getId());
@@ -73,6 +86,8 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
         appeal.setUserId(userId);
         appeal.setAppealReason(reason);
         appeal.setAppealStatus(0); // 待审
+        appeal.setAppealVersion(version);
+        appeal.setPreviousAppealId(previousAppealId);
         return appealMapper.insert(appeal);
     }
 
@@ -110,12 +125,21 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
             userCreditService.changeCredit(appeal.getUserId(), 5,
                     "申诉通过，信用分回补", "appeal", appealId);
 
+            // 记录信用分补偿明细
+            creditCompensationService.recordDetail(appealId, appeal.getUserId(),
+                    "BASE_RESTORE", 3, "内容被错误下架，基础信用恢复");
+            creditCompensationService.recordDetail(appealId, appeal.getUserId(),
+                    "INTERACTION_RESTORE", 2, "下架期间互动损失补偿");
+
             // 记录信用分回补的审核日志
             moderationRecordService.recordAction(
                     appeal.getContentId(), "CREDIT", appeal.getUserId(),
                     "APPEAL", "CREDIT_RESTORE",
                     "申诉通过信用分回补+5, appealId=" + appealId,
                     null, null, null);
+
+            // 清除缓存
+            governanceCacheHelper.evictContentCaches(appeal.getContentId());
         }
         // 如果拒绝(decision=2)，不做任何内容恢复操作，终局
 

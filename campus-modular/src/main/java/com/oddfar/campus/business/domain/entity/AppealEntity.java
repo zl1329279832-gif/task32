@@ -33,6 +33,12 @@ public class AppealEntity extends BaseEntity {
     /** 申诉状态：0=待审, 1=通过, 2=拒绝 */
     private Integer appealStatus;
 
+    /** 申诉版本号 */
+    private Integer appealVersion;
+
+    /** 上一次申诉id */
+    private Long previousAppealId;
+
     /** 审核管理员id */
     private Long adminId;
 

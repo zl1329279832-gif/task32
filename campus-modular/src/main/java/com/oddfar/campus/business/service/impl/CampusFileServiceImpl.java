@@ -219,6 +219,7 @@ public class CampusFileServiceImpl extends ServiceImpl<CampusFileMapper, CampusF
 
         entity.setViolationStatus(0);
         entity.setViolationReason(null);
+        entity.setReviewStatus(1); // 清除违规后需要复核
         int rows = campusFileMapper.updateById(entity);
 
         // 记录审核操作日志
@@ -227,6 +228,35 @@ public class CampusFileServiceImpl extends ServiceImpl<CampusFileMapper, CampusF
                 "MANUAL", "RESTORE",
                 "附件违规清除",
                 null, 1, 0);
+
+        return rows;
+    }
+
+    @Override
+    public int reviewFile(Long fileId, Integer reviewStatus, String reviewComment) {
+        CampusFileEntity entity = campusFileMapper.selectById(fileId);
+        if (entity == null) {
+            throw new ServiceException("文件不存在");
+        }
+
+        // 幂等：已经是相同复核状态则跳过
+        if (entity.getReviewStatus() != null && entity.getReviewStatus().equals(reviewStatus)) {
+            return 0;
+        }
+
+        entity.setReviewStatus(reviewStatus);
+        entity.setReviewAdminId(SecurityUtils.getUserId());
+        entity.setReviewTime(new Date());
+        entity.setReviewComment(reviewComment);
+        int rows = campusFileMapper.updateById(entity);
+
+        // 记录审核操作日志
+        String action = reviewStatus == 2 ? "REVIEW_PASS" : "REVIEW_REJECT";
+        moderationRecordService.recordAction(
+                entity.getContentId(), "FILE", fileId,
+                "MANUAL", action,
+                "附件复核: " + (reviewComment != null ? reviewComment : ""),
+                null, entity.getViolationStatus(), entity.getViolationStatus());
 
         return rows;
     }

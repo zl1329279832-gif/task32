@@ -46,6 +46,10 @@ public class InteractionSnapshotServiceImpl extends ServiceImpl<InteractionSnaps
         snapshot.setContentId(contentId);
         snapshot.setLoveCount(content.getLoveCount() != null ? content.getLoveCount() : 0L);
         snapshot.setCommentCount(commentCount != null ? commentCount : 0L);
+        snapshot.setRecommendCount(0L);
+        snapshot.setFavoriteCount(0L);
+        snapshot.setReportCount(0L);
+        snapshot.setSearchHitCount(0L);
         snapshot.setSnapshotType(snapshotType);
         snapshot.setModerationRecordId(moderationRecordId);
         snapshot.setCreateTime(new Date());

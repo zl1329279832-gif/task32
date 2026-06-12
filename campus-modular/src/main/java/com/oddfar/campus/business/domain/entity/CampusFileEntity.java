@@ -52,6 +52,27 @@ public class CampusFileEntity {
      */
     private String violationReason;
 
+    /**
+     * 复核状态：0=无需复核, 1=待复核, 2=复核通过, 3=复核不通过
+     */
+    private Integer reviewStatus;
+
+    /**
+     * 复核管理员id
+     */
+    private Long reviewAdminId;
+
+    /**
+     * 复核时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    private Date reviewTime;
+
+    /**
+     * 复核意见
+     */
+    private String reviewComment;
+
     @TableField(fill = FieldFill.INSERT)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date createTime;

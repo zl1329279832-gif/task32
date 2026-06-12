@@ -36,4 +36,15 @@ public interface AppealMapper extends BaseMapperX<AppealEntity> {
                 .eq(AppealEntity::getContentId, contentId)
                 .in(AppealEntity::getAppealStatus, 0, 1));
     }
+
+    /**
+     * 查询某内容最近一次被拒绝的申诉
+     */
+    default AppealEntity selectLatestRejected(Long contentId) {
+        return selectOne(new LambdaQueryWrapperX<AppealEntity>()
+                .eq(AppealEntity::getContentId, contentId)
+                .eq(AppealEntity::getAppealStatus, 2)
+                .orderByDesc(AppealEntity::getCreateTime)
+                .last("LIMIT 1"));
+    }
 }

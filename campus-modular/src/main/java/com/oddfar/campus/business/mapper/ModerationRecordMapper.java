@@ -18,4 +18,13 @@ public interface ModerationRecordMapper extends BaseMapperX<ModerationRecordEnti
                 .eq(ModerationRecordEntity::getContentId, contentId)
                 .orderByDesc(ModerationRecordEntity::getCreateTime));
     }
+
+    /**
+     * 根据批次id查询审核记录
+     */
+    default List<ModerationRecordEntity> selectByBatchId(Long batchId) {
+        return selectList(new LambdaQueryWrapperX<ModerationRecordEntity>()
+                .eq(ModerationRecordEntity::getBatchId, batchId)
+                .orderByDesc(ModerationRecordEntity::getCreateTime));
+    }
 }

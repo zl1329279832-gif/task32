@@ -68,4 +68,9 @@ public class CommentEntity extends BaseEntity {
      */
     private Integer frozenStatus;
 
+    /**
+     * 只读状态：0=可编辑, 1=只读(恢复后)
+     */
+    private Integer readOnlyStatus;
+
 }

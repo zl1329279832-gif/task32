@@ -45,6 +45,9 @@ public class ModerationRecordEntity extends BaseEntity {
     /** 管理员名称 */
     private String adminName;
 
+    /** 治理批次id */
+    private Long batchId;
+
     /** 操作前状态 */
     private Integer beforeStatus;
 

@@ -8,6 +8,7 @@ import com.oddfar.campus.business.mapper.ContentLoveMapper;
 import com.oddfar.campus.business.mapper.ContentMapper;
 import com.oddfar.campus.business.service.*;
 import com.oddfar.campus.business.service.impl.ContentServiceImpl;
+import com.oddfar.campus.business.service.impl.GovernanceCacheHelper;
 import com.oddfar.campus.common.core.LambdaQueryWrapperX;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,8 @@ public class CommentFreezeCascadeTest extends BaseTest {
     private TagService tagService;
     @Mock
     private CategoryService categoryService;
+    @Mock
+    private GovernanceCacheHelper governanceCacheHelper;
 
     @BeforeEach
     void setUp() {

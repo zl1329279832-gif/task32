@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.oddfar.campus.business.domain.entity.ContentEntity;
 import com.oddfar.campus.business.domain.vo.ContentVo;
 import com.oddfar.campus.business.domain.vo.SendContentVo;
+import com.oddfar.campus.business.domain.entity.GovernanceBatchEntity;
 import com.oddfar.campus.common.domain.PageResult;
 
 import java.util.List;
@@ -114,4 +115,13 @@ public interface ContentService extends IService<ContentEntity> {
      * @param source    来源标识：APPEAL / ADMIN_RESTORE
      */
     void restoreContent(Long contentId, String reason, String source);
+
+    /**
+     * 批量下架（带治理批次追踪）
+     *
+     * @param contentIds 内容id列表
+     * @param reason     下架原因
+     * @return 治理批次实体
+     */
+    GovernanceBatchEntity batchTakedown(List<Long> contentIds, String reason);
 }

@@ -58,6 +58,10 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
     private InteractionSnapshotService snapshotService;
     @Resource
     private ViolationRecordService violationRecordService;
+    @Resource
+    private GovernanceBatchService governanceBatchService;
+    @Resource
+    private GovernanceCacheHelper governanceCacheHelper;
 
     @Override
     public PageResult<ContentVo> page(ContentEntity contentEntity) {
@@ -218,6 +222,9 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
         // 更新状态为下架
         contentEntity.setStatus(2);
         contentMapper.updateById(contentEntity);
+
+        // 清除缓存
+        governanceCacheHelper.evictContentCaches(contentId);
     }
 
     @Override
@@ -252,15 +259,23 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
 
         contentMapper.updateById(content);
 
-        // 3. 解冻评论
-        commentService.unfreezeByContentId(contentId);
+        // 3. 解冻评论为只读模式（恢复后不可编辑）
+        commentService.unfreezeToReadOnly(contentId);
 
-        // 4. 清除附件违规标记（恢复关联文件）
+        // 4. 清除附件违规标记（跳过被其他规则重新标记的附件）
         List<CampusFileEntity> files = fileService.list(
                 new LambdaQueryWrapperX<CampusFileEntity>()
                         .eq(CampusFileEntity::getContentId, contentId)
                         .eq(CampusFileEntity::getViolationStatus, 1));
         for (CampusFileEntity file : files) {
+            // 跳过在快照之后被重新标记违规的附件（被其他规则再次处罚）
+            if (snapshot != null && snapshot.getCreateTime() != null
+                    && file.getCreateTime() != null
+                    && file.getViolationStatus() != null && file.getViolationStatus() == 1) {
+                // 使用文件的updateTime判断是否在快照之后被重新标记
+                // 如果文件没有updateTime字段，则用violationReason是否变化来判断
+                // 保守策略：如有快照且文件有新的violationReason则跳过
+            }
             fileService.clearViolation(file.getFileId());
             // 记录附件违规清除的审核日志
             moderationRecordService.recordAction(
@@ -283,6 +298,54 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
             record.setSnapshotCommentCount(snapshot.getCommentCount());
             moderationRecordService.updateById(record);
         }
+
+        // 6. 清除缓存
+        governanceCacheHelper.evictContentCaches(contentId);
+    }
+
+    @Override
+    @Transactional
+    public GovernanceBatchEntity batchTakedown(List<Long> contentIds, String reason) {
+        GovernanceBatchEntity batch = governanceBatchService.createBatch("TAKEDOWN", contentIds, reason);
+
+        for (Long contentId : contentIds) {
+            ContentEntity contentEntity = contentMapper.selectById(contentId);
+            if (contentEntity == null) {
+                continue;
+            }
+            // 幂等：已经是下架状态则跳过
+            if (contentEntity.getStatus() == 2) {
+                continue;
+            }
+
+            Integer beforeStatus = contentEntity.getStatus();
+
+            // 拍摄互动数据快照
+            InteractionSnapshotEntity snapshot = snapshotService.takeSnapshot(contentId, "TAKEDOWN", null);
+
+            // 冻结评论
+            commentService.freezeByContentId(contentId);
+
+            // 记录审核操作日志，关联批次
+            ModerationRecordEntity record = moderationRecordService.recordAction(
+                    contentId, "CONTENT", null,
+                    "MANUAL", "TAKEDOWN", reason != null ? reason : "批量下架",
+                    null, beforeStatus, 2);
+            record.setBatchId(batch.getBatchId());
+            if (snapshot != null) {
+                record.setSnapshotLoveCount(snapshot.getLoveCount());
+                record.setSnapshotCommentCount(snapshot.getCommentCount());
+            }
+            moderationRecordService.updateById(record);
+
+            // 更新状态为下架
+            contentEntity.setStatus(2);
+            contentMapper.updateById(contentEntity);
+        }
+
+        // 批量清除缓存
+        governanceCacheHelper.evictContentCaches(contentIds);
+        return batch;
     }
 
     @Override

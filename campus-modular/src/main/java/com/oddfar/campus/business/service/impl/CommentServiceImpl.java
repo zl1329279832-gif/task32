@@ -147,6 +147,12 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, CommentEntity
                         CampusBizCodeEnum.COMMENT_IS_NULL.getCode());
             }
 
+            // 只读评论不允许回复
+            if (commentEntity.getReadOnlyStatus() != null && commentEntity.getReadOnlyStatus() == 1) {
+                throw new ServiceException(CampusBizCodeEnum.COMMENT_READ_ONLY.getMsg(),
+                        CampusBizCodeEnum.COMMENT_READ_ONLY.getCode());
+            }
+
             comment.setParentId(commentEntity.getCommentId());
             //设置一级评论id
             if (commentEntity.getParentId() == 0) {
@@ -170,6 +176,12 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, CommentEntity
 
     @Override
     public int updateComment(CommentEntity comment) {
+        // 只读评论不允许编辑
+        CommentEntity existing = commentMapper.selectById(comment.getCommentId());
+        if (existing != null && existing.getReadOnlyStatus() != null && existing.getReadOnlyStatus() == 1) {
+            throw new ServiceException(CampusBizCodeEnum.COMMENT_READ_ONLY.getMsg(),
+                    CampusBizCodeEnum.COMMENT_READ_ONLY.getCode());
+        }
         return commentMapper.updateById(comment);
     }
 
@@ -206,6 +218,16 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, CommentEntity
     public int unfreezeByContentId(Long contentId) {
         CommentEntity update = new CommentEntity();
         update.setFrozenStatus(0);
+        return commentMapper.update(update, new LambdaQueryWrapperX<CommentEntity>()
+                .eq(CommentEntity::getContentId, contentId)
+                .eq(CommentEntity::getFrozenStatus, 1));
+    }
+
+    @Override
+    public int unfreezeToReadOnly(Long contentId) {
+        CommentEntity update = new CommentEntity();
+        update.setFrozenStatus(0);
+        update.setReadOnlyStatus(1);
         return commentMapper.update(update, new LambdaQueryWrapperX<CommentEntity>()
                 .eq(CommentEntity::getContentId, contentId)
                 .eq(CommentEntity::getFrozenStatus, 1));
