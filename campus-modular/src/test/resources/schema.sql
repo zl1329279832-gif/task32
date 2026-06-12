@@ -147,21 +147,22 @@ CREATE TABLE IF NOT EXISTS `campus_content` (
 );
 
 CREATE TABLE IF NOT EXISTS `campus_comment` (
-  `comment_id` bigint NOT NULL,
-  `parent_id` bigint DEFAULT 0,
-  `user_id` bigint DEFAULT NULL,
-  `to_user_id` bigint DEFAULT NULL,
-  `one_level_id` bigint DEFAULT -1,
-  `content_id` bigint DEFAULT NULL,
-  `co_content` varchar(500) DEFAULT NULL,
-  `ip` varchar(50) DEFAULT NULL,
-  `address` varchar(100) DEFAULT NULL,
-  `frozen_status` int DEFAULT 0,
-  `del_flag` bit(1) DEFAULT b'0',
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
-  `create_user` bigint DEFAULT NULL,
-  `update_time` datetime DEFAULT CURRENT_TIMESTAMP,
-  `update_user` bigint DEFAULT NULL,
+  `comment_id`      bigint       NOT NULL,
+  `parent_id`       bigint       DEFAULT 0,
+  `user_id`         bigint       DEFAULT NULL,
+  `to_user_id`      bigint       DEFAULT NULL,
+  `one_level_id`    bigint       DEFAULT -1,
+  `content_id`      bigint       DEFAULT NULL,
+  `co_content`      varchar(500) DEFAULT NULL,
+  `ip`              varchar(50)  DEFAULT NULL,
+  `address`         varchar(100) DEFAULT NULL,
+  `frozen_status`   int          DEFAULT 0,
+  `read_only_until` datetime     DEFAULT NULL,
+  `del_flag`        bit(1)       DEFAULT b'0',
+  `create_time`     datetime     DEFAULT CURRENT_TIMESTAMP,
+  `create_user`     bigint       DEFAULT NULL,
+  `update_time`     datetime     DEFAULT CURRENT_TIMESTAMP,
+  `update_user`     bigint       DEFAULT NULL,
   PRIMARY KEY (`comment_id`)
 );
 
@@ -173,13 +174,14 @@ CREATE TABLE IF NOT EXISTS `campus_content_love` (
 );
 
 CREATE TABLE IF NOT EXISTS `campus_file` (
-  `file_id` bigint NOT NULL,
-  `content_id` bigint DEFAULT NULL,
-  `user_id` bigint DEFAULT NULL,
-  `url` varchar(500) DEFAULT NULL,
-  `violation_status` int DEFAULT 0,
+  `file_id`          bigint       NOT NULL,
+  `content_id`       bigint       DEFAULT NULL,
+  `user_id`          bigint       DEFAULT NULL,
+  `url`              varchar(500) DEFAULT NULL,
+  `violation_status` int          DEFAULT 0,
   `violation_reason` varchar(200) DEFAULT NULL,
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `review_status`    int          DEFAULT 0,
+  `create_time`      datetime     DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`file_id`)
 );
 
@@ -272,6 +274,7 @@ CREATE TABLE IF NOT EXISTS `campus_moderation_record` (
   `after_status` int DEFAULT NULL,
   `snapshot_love_count` bigint DEFAULT NULL,
   `snapshot_comment_count` bigint DEFAULT NULL,
+  `batch_id` bigint DEFAULT NULL,
   `del_flag` bit(1) DEFAULT b'0',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
   `create_user` bigint DEFAULT NULL,
@@ -290,6 +293,7 @@ CREATE TABLE IF NOT EXISTS `campus_appeal` (
   `admin_name` varchar(50) DEFAULT NULL,
   `review_comment` varchar(500) DEFAULT NULL,
   `review_time` datetime DEFAULT NULL,
+  `processing_version` int DEFAULT 1,
   `del_flag` bit(1) DEFAULT b'0',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
   `create_user` bigint DEFAULT NULL,
@@ -303,6 +307,10 @@ CREATE TABLE IF NOT EXISTS `campus_interaction_snapshot` (
   `content_id` bigint NOT NULL,
   `love_count` bigint DEFAULT 0,
   `comment_count` bigint DEFAULT 0,
+  `recommend_count` bigint DEFAULT 0,
+  `bookmark_count` bigint DEFAULT 0,
+  `report_count` bigint DEFAULT 0,
+  `search_hit_count` bigint DEFAULT 0,
   `snapshot_type` varchar(20) DEFAULT 'TAKEDOWN',
   `moderation_record_id` bigint DEFAULT NULL,
   `del_flag` bit(1) DEFAULT b'0',
@@ -410,4 +418,31 @@ CREATE TABLE IF NOT EXISTS `social_user_auth` (
   `source` varchar(50) DEFAULT NULL,
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
+);
+
+-- 增强治理表
+CREATE TABLE IF NOT EXISTS `campus_governance_batch` (
+  `batch_id` bigint NOT NULL,
+  `batch_type` varchar(20) NOT NULL,
+  `admin_id` bigint NOT NULL,
+  `reason` varchar(500) DEFAULT NULL,
+  `content_count` int DEFAULT 0,
+  `del_flag` bit(1) DEFAULT b'0',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `create_user` bigint DEFAULT NULL,
+  PRIMARY KEY (`batch_id`)
+);
+
+CREATE TABLE IF NOT EXISTS `campus_credit_compensation` (
+  `compensation_id` bigint NOT NULL,
+  `user_id` bigint NOT NULL,
+  `appeal_id` bigint NOT NULL,
+  `content_id` bigint NOT NULL,
+  `base_compensation` int DEFAULT 5,
+  `bonus_compensation` int DEFAULT 0,
+  `reason` varchar(500) DEFAULT NULL,
+  `del_flag` bit(1) DEFAULT b'0',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `create_user` bigint DEFAULT NULL,
+  PRIMARY KEY (`compensation_id`)
 );

@@ -1,6 +1,7 @@
 package com.oddfar.campus.business.controller.admin;
 
 import com.oddfar.campus.business.domain.entity.ContentEntity;
+import com.oddfar.campus.business.domain.entity.GovernanceBatchEntity;
 import com.oddfar.campus.business.domain.entity.ModerationRecordEntity;
 import com.oddfar.campus.business.domain.vo.BatchReviewVo;
 import com.oddfar.campus.business.enums.CampusBizCodeEnum;
@@ -35,6 +36,8 @@ public class GovernanceModerationController {
     private UserCreditService userCreditService;
     @Autowired
     private AdminModerationScopeService scopeService;
+    @Autowired
+    private GovernanceBatchService governanceBatchService;
 
     /**
      * 批量审核通过
@@ -43,6 +46,11 @@ public class GovernanceModerationController {
     @PostMapping(value = "/batchApprove", name = "批量审核通过")
     public R batchApprove(@Validated @RequestBody BatchReviewVo vo) {
         Long adminUserId = SecurityUtils.getUserId();
+        // 创建治理批次
+        GovernanceBatchEntity batch = governanceBatchService.createBatch(
+                "BATCH_REVIEW", adminUserId,
+                vo.getReason() != null ? vo.getReason() : "管理员批量审核通过",
+                vo.getContentIds().size());
         for (Long contentId : vo.getContentIds()) {
             checkScope(adminUserId, contentId);
             ContentEntity content = contentService.getById(contentId);
@@ -63,6 +71,11 @@ public class GovernanceModerationController {
     @PostMapping(value = "/batchReject", name = "批量审核拒绝")
     public R batchReject(@Validated @RequestBody BatchReviewVo vo) {
         Long adminUserId = SecurityUtils.getUserId();
+        // 创建治理批次
+        GovernanceBatchEntity batch = governanceBatchService.createBatch(
+                "REJECT", adminUserId,
+                vo.getReason() != null ? vo.getReason() : "管理员批量审核拒绝",
+                vo.getContentIds().size());
         for (Long contentId : vo.getContentIds()) {
             checkScope(adminUserId, contentId);
             ContentEntity content = contentService.getById(contentId);

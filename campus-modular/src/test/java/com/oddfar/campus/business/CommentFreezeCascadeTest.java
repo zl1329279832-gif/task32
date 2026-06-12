@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -46,6 +47,14 @@ public class CommentFreezeCascadeTest extends BaseTest {
     private TagService tagService;
     @Mock
     private CategoryService categoryService;
+    @Mock
+    private ViolationRecordService violationRecordService;
+    @Mock
+    private GovernanceBatchService governanceBatchService;
+    @Mock
+    private GovernanceCacheService governanceCacheService;
+    @Mock
+    private ContentLoveService contentLoveService;
 
     @BeforeEach
     void setUp() {
@@ -64,18 +73,25 @@ public class CommentFreezeCascadeTest extends BaseTest {
         when(contentMapper.selectById(1001L)).thenReturn(content);
         when(contentMapper.updateById(any(ContentEntity.class))).thenReturn(1);
 
-        // 调用deleteContentById（已改为下架逻辑）
-        contentService.deleteContentById(1001L);
+        try (MockedStatic<com.oddfar.campus.common.utils.SecurityUtils> secMock =
+                     mockStatic(com.oddfar.campus.common.utils.SecurityUtils.class)) {
+            secMock.when(com.oddfar.campus.common.utils.SecurityUtils::getUserId).thenReturn(1L);
+            when(governanceBatchService.createBatch(anyString(), anyLong(), anyString(), anyInt()))
+                    .thenReturn(createBatch(5001L, "TAKEDOWN", 1L, 1));
 
-        // 验证快照被拍摄
-        verify(snapshotService).takeSnapshot(1001L, "TAKEDOWN", null);
-        // 验证评论被冻结
-        verify(commentService).freezeByContentId(1001L);
-        // 验证审核记录被写入
-        verify(moderationRecordService).recordAction(eq(1001L), eq("CONTENT"), isNull(),
-                eq("MANUAL"), eq("TAKEDOWN"), anyString(), isNull(), eq(1), eq(2));
-        // 验证内容状态更新为下架(2)
-        assertEquals(2, content.getStatus());
+            // 调用deleteContentById（已改为下架逻辑）
+            contentService.deleteContentById(1001L);
+
+            // 验证快照被拍摄
+            verify(snapshotService).takeSnapshot(1001L, "TAKEDOWN", null);
+            // 验证评论被冻结
+            verify(commentService).freezeByContentId(1001L);
+            // 验证审核记录被写入
+            verify(moderationRecordService).recordAction(eq(1001L), eq("CONTENT"), isNull(),
+                    eq("MANUAL"), eq("TAKEDOWN"), anyString(), isNull(), eq(1), eq(2));
+            // 验证内容状态更新为下架(2)
+            assertEquals(2, content.getStatus());
+        }
     }
 
     /**
@@ -96,12 +112,12 @@ public class CommentFreezeCascadeTest extends BaseTest {
     }
 
     /**
-     * 解冻评论应调用unfreezeByContentId
+     * 解冻评论应调用unfreezeByContentIdWithReadOnly
      */
     @Test
     void appealApprovalShouldUnfreezeComments() {
-        // 验证CommentService接口有unfreezeByContentId方法
-        commentService.unfreezeByContentId(1001L);
-        verify(commentService).unfreezeByContentId(1001L);
+        // 验证CommentService接口有unfreezeByContentIdWithReadOnly方法
+        commentService.unfreezeByContentIdWithReadOnly(1001L, 60);
+        verify(commentService).unfreezeByContentIdWithReadOnly(1001L, 60);
     }
 }

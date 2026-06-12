@@ -39,6 +39,12 @@ public class AppealFullCascadeTest extends BaseTest {
     private ModerationRecordService moderationRecordService;
     @Mock
     private UserCreditService userCreditService;
+    @Mock
+    private CreditCompensationService creditCompensationService;
+    @Mock
+    private GovernanceCacheService governanceCacheService;
+    @Mock
+    private InteractionSnapshotService snapshotService;
 
     @BeforeEach
     void setUp() {
@@ -61,6 +67,11 @@ public class AppealFullCascadeTest extends BaseTest {
         when(appealMapper.selectById(5001L)).thenReturn(appeal);
         // updateById 成功
         when(appealMapper.updateById(any())).thenReturn(1);
+        // mock快照用于计算补偿分
+        InteractionSnapshotEntity snapshot = new InteractionSnapshotEntity();
+        snapshot.setLoveCount(10L);
+        snapshot.setCommentCount(5L);
+        lenient().when(snapshotService.getLatestSnapshot(1001L)).thenReturn(snapshot);
 
         try (MockedStatic<com.oddfar.campus.common.utils.SecurityUtils> secMock =
                      mockStatic(com.oddfar.campus.common.utils.SecurityUtils.class)) {
@@ -74,15 +85,20 @@ public class AppealFullCascadeTest extends BaseTest {
             verify(contentService).restoreContent(eq(1001L),
                     contains("申诉通过"), eq("APPEAL"));
 
-            // 验证信用分回补
-            verify(userCreditService).changeCredit(
-                    eq(100L), eq(5), anyString(), eq("appeal"), eq(5001L));
+            // 验证信用分补偿明细被创建（替代直接调用changeCredit）
+            verify(creditCompensationService).compensate(
+                    eq(100L), eq(5001L), eq(1001L),
+                    eq(5), anyInt(), anyString());
 
             // 验证信用分回补的审核日志被记录
             verify(moderationRecordService).recordAction(
                     eq(1001L), eq("CREDIT"), eq(100L),
                     eq("APPEAL"), eq("CREDIT_RESTORE"),
                     anyString(), isNull(), isNull(), isNull());
+
+            // 验证缓存被清除
+            verify(governanceCacheService).evictContentCaches(1001L);
+            verify(governanceCacheService).evictUserCaches(100L);
         }
     }
 
@@ -105,8 +121,10 @@ public class AppealFullCascadeTest extends BaseTest {
 
             // 不应该调用恢复
             verify(contentService, never()).restoreContent(anyLong(), anyString(), anyString());
-            // 不应该调用信用分回补
-            verify(userCreditService, never()).changeCredit(anyLong(), anyInt(), anyString(), anyString(), anyLong());
+            // 不应该调用信用分补偿
+            verify(creditCompensationService, never()).compensate(anyLong(), anyLong(), anyLong(), anyInt(), anyInt(), anyString());
+            // 不应该清除缓存
+            verify(governanceCacheService, never()).evictContentCaches(anyLong());
         }
     }
 
@@ -128,7 +146,7 @@ public class AppealFullCascadeTest extends BaseTest {
 
             // 恢复操作不应被调用
             verify(contentService, never()).restoreContent(anyLong(), anyString(), anyString());
-            verify(userCreditService, never()).changeCredit(anyLong(), anyInt(), anyString(), anyString(), anyLong());
+            verify(creditCompensationService, never()).compensate(anyLong(), anyLong(), anyLong(), anyInt(), anyInt(), anyString());
         }
     }
 

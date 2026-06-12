@@ -5,11 +5,13 @@ import com.oddfar.campus.business.mapper.ContentLoveMapper;
 import com.oddfar.campus.business.mapper.ContentMapper;
 import com.oddfar.campus.business.service.*;
 import com.oddfar.campus.business.service.impl.ContentServiceImpl;
+import com.oddfar.campus.common.utils.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
@@ -49,6 +51,12 @@ public class GovernanceStateMachineTest extends BaseTest {
     private CategoryService categoryService;
     @Mock
     private ViolationRecordService violationRecordService;
+    @Mock
+    private GovernanceBatchService governanceBatchService;
+    @Mock
+    private GovernanceCacheService governanceCacheService;
+    @Mock
+    private ContentLoveService contentLoveService;
 
     @BeforeEach
     void setUp() {
@@ -84,7 +92,12 @@ public class GovernanceStateMachineTest extends BaseTest {
         snapshot.setCommentCount(5L);
         when(snapshotService.takeSnapshot(eq(contentId), eq("TAKEDOWN"), isNull())).thenReturn(snapshot);
 
-        contentService.deleteContentById(contentId);
+        try (MockedStatic<SecurityUtils> secMock = mockStatic(SecurityUtils.class)) {
+            secMock.when(SecurityUtils::getUserId).thenReturn(1L);
+            when(governanceBatchService.createBatch(anyString(), anyLong(), anyString(), anyInt()))
+                    .thenReturn(createBatch(5001L, "TAKEDOWN", 1L, 1));
+            contentService.deleteContentById(contentId);
+        }
 
         // 验证下架后状态
         assertEquals(2, content.getStatus());
@@ -104,7 +117,7 @@ public class GovernanceStateMachineTest extends BaseTest {
         // 验证恢复后状态
         assertEquals(1, content.getStatus());
         assertEquals(15L, content.getLoveCount());
-        verify(commentService).unfreezeByContentId(contentId);
+        verify(commentService).unfreezeByContentIdWithReadOnly(contentId, 60);
     }
 
     /**
@@ -126,7 +139,12 @@ public class GovernanceStateMachineTest extends BaseTest {
         snapshot1.setCommentCount(3L);
         when(snapshotService.takeSnapshot(eq(contentId), eq("TAKEDOWN"), isNull())).thenReturn(snapshot1);
 
-        contentService.deleteContentById(contentId);
+        try (MockedStatic<SecurityUtils> secMock = mockStatic(SecurityUtils.class)) {
+            secMock.when(SecurityUtils::getUserId).thenReturn(1L);
+            when(governanceBatchService.createBatch(anyString(), anyLong(), anyString(), anyInt()))
+                    .thenReturn(createBatch(5001L, "TAKEDOWN", 1L, 1));
+            contentService.deleteContentById(contentId);
+        }
         assertEquals(2, content.getStatus());
 
         // === 第一次恢复 ===
@@ -152,7 +170,12 @@ public class GovernanceStateMachineTest extends BaseTest {
         snapshot2.setCommentCount(7L); // 恢复期间可能有新评论
         when(snapshotService.takeSnapshot(eq(contentId), eq("TAKEDOWN"), isNull())).thenReturn(snapshot2);
 
-        contentService.deleteContentById(contentId);
+        try (MockedStatic<SecurityUtils> secMock = mockStatic(SecurityUtils.class)) {
+            secMock.when(SecurityUtils::getUserId).thenReturn(1L);
+            when(governanceBatchService.createBatch(anyString(), anyLong(), anyString(), anyInt()))
+                    .thenReturn(createBatch(5002L, "TAKEDOWN", 1L, 1));
+            contentService.deleteContentById(contentId);
+        }
         assertEquals(2, content.getStatus());
 
         // === 第二次恢复 ===
@@ -181,7 +204,12 @@ public class GovernanceStateMachineTest extends BaseTest {
         when(contentMapper.selectById(contentId)).thenReturn(content);
         when(snapshotService.takeSnapshot(eq(contentId), anyString(), any())).thenReturn(new InteractionSnapshotEntity());
 
-        contentService.deleteContentById(contentId);
+        try (MockedStatic<SecurityUtils> secMock = mockStatic(SecurityUtils.class)) {
+            secMock.when(SecurityUtils::getUserId).thenReturn(1L);
+            when(governanceBatchService.createBatch(anyString(), anyLong(), anyString(), anyInt()))
+                    .thenReturn(createBatch(5003L, "TAKEDOWN", 1L, 1));
+            contentService.deleteContentById(contentId);
+        }
         assertEquals(2, content.getStatus());
 
         // 第二次下架（内容已经是status=2）
@@ -223,7 +251,7 @@ public class GovernanceStateMachineTest extends BaseTest {
         contentService.restoreContent(contentId, "重复恢复", "ADMIN_RESTORE");
 
         verify(snapshotService, never()).getLatestSnapshot(anyLong());
-        verify(commentService, never()).unfreezeByContentId(anyLong());
+        verify(commentService, never()).unfreezeByContentIdWithReadOnly(anyLong(), anyInt());
     }
 
     /**
@@ -241,7 +269,12 @@ public class GovernanceStateMachineTest extends BaseTest {
         when(snapshotService.takeSnapshot(eq(contentId), anyString(), any()))
                 .thenReturn(new InteractionSnapshotEntity());
 
-        contentService.deleteContentById(contentId);
+        try (MockedStatic<SecurityUtils> secMock = mockStatic(SecurityUtils.class)) {
+            secMock.when(SecurityUtils::getUserId).thenReturn(1L);
+            when(governanceBatchService.createBatch(anyString(), anyLong(), anyString(), anyInt()))
+                    .thenReturn(createBatch(5005L, "TAKEDOWN", 1L, 1));
+            contentService.deleteContentById(contentId);
+        }
         assertEquals(2, content.getStatus());
 
         // 申诉通过恢复
@@ -270,7 +303,7 @@ public class GovernanceStateMachineTest extends BaseTest {
         // 验证完整恢复
         assertEquals(1, content.getStatus());
         assertEquals(8L, content.getLoveCount());
-        verify(commentService).unfreezeByContentId(contentId);
+        verify(commentService).unfreezeByContentIdWithReadOnly(contentId, 60);
         verify(fileService).clearViolation(4001L);
     }
 

@@ -166,3 +166,63 @@ ALTER TABLE `campus_file`
   COMMENT '0=正常, 1=标记违规' AFTER `url`,
   ADD COLUMN `violation_reason` varchar(200) DEFAULT NULL
   COMMENT '违规原因' AFTER `violation_status`;
+
+-- ============================================================
+-- 增强治理：影响面恢复与申诉追踪
+-- ============================================================
+
+-- 11. 增强互动数据快照字段
+ALTER TABLE `campus_interaction_snapshot`
+  ADD COLUMN `recommend_count`  bigint DEFAULT 0 COMMENT '被推荐次数' AFTER `comment_count`,
+  ADD COLUMN `bookmark_count`   bigint DEFAULT 0 COMMENT '被收藏次数' AFTER `recommend_count`,
+  ADD COLUMN `report_count`     bigint DEFAULT 0 COMMENT '被举报次数' AFTER `bookmark_count`,
+  ADD COLUMN `search_hit_count` bigint DEFAULT 0 COMMENT '被搜索命中次数' AFTER `report_count`;
+
+-- 12. 治理批次表
+CREATE TABLE IF NOT EXISTS `campus_governance_batch` (
+  `batch_id`      bigint       NOT NULL,
+  `batch_type`    varchar(20)  NOT NULL COMMENT 'TAKEDOWN/REJECT/BATCH_REVIEW',
+  `admin_id`      bigint       NOT NULL,
+  `reason`        varchar(500) DEFAULT NULL,
+  `content_count` int          DEFAULT 0 COMMENT '涉及内容数',
+  `del_flag`      bit(1)       DEFAULT b'0',
+  `create_time`   datetime     DEFAULT CURRENT_TIMESTAMP,
+  `create_user`   bigint       DEFAULT NULL,
+  PRIMARY KEY (`batch_id`),
+  KEY `idx_admin_id` (`admin_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='治理批次';
+
+-- 13. 审核记录增加批次关联
+ALTER TABLE `campus_moderation_record`
+  ADD COLUMN `batch_id` bigint DEFAULT NULL COMMENT '关联治理批次id' AFTER `snapshot_comment_count`;
+
+-- 14. 申诉增加处理版本
+ALTER TABLE `campus_appeal`
+  ADD COLUMN `processing_version` int DEFAULT 1 COMMENT '处理版本（二次下架后递增）' AFTER `review_time`;
+
+-- 15. 附件增加复核状态
+ALTER TABLE `campus_file`
+  ADD COLUMN `review_status` tinyint DEFAULT 0
+  COMMENT '0=未复核, 1=复核通过, 2=维持违规' AFTER `violation_reason`;
+
+-- 16. 信用分补偿明细表
+CREATE TABLE IF NOT EXISTS `campus_credit_compensation` (
+  `compensation_id`    bigint       NOT NULL,
+  `user_id`            bigint       NOT NULL,
+  `appeal_id`          bigint       NOT NULL,
+  `content_id`         bigint       NOT NULL,
+  `base_compensation`  int          DEFAULT 5 COMMENT '基础补偿分',
+  `bonus_compensation` int          DEFAULT 0 COMMENT '额外补偿分（高影响力）',
+  `reason`             varchar(500) DEFAULT NULL,
+  `del_flag`           bit(1)       DEFAULT b'0',
+  `create_time`        datetime     DEFAULT CURRENT_TIMESTAMP,
+  `create_user`        bigint       DEFAULT NULL,
+  PRIMARY KEY (`compensation_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_appeal_id` (`appeal_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='信用分补偿明细';
+
+-- 17. 评论只读截止时间
+ALTER TABLE `campus_comment`
+  ADD COLUMN `read_only_until` datetime DEFAULT NULL
+  COMMENT '评论只读截止时间' AFTER `frozen_status`;

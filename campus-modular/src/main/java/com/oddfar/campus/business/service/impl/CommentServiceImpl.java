@@ -210,6 +210,19 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, CommentEntity
                 .eq(CommentEntity::getContentId, contentId)
                 .eq(CommentEntity::getFrozenStatus, 1));
     }
+
+    @Override
+    public int unfreezeByContentIdWithReadOnly(Long contentId, int readOnlyMinutes) {
+        CommentEntity update = new CommentEntity();
+        update.setFrozenStatus(0);
+        // 设置只读截止时间
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.add(java.util.Calendar.MINUTE, readOnlyMinutes);
+        update.setReadOnlyUntil(cal.getTime());
+        return commentMapper.update(update, new LambdaQueryWrapperX<CommentEntity>()
+                .eq(CommentEntity::getContentId, contentId)
+                .eq(CommentEntity::getFrozenStatus, 1));
+    }
 }
 
 

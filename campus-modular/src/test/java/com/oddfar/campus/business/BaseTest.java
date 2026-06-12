@@ -4,6 +4,8 @@ import com.oddfar.campus.business.domain.entity.*;
 import com.oddfar.campus.business.mapper.*;
 import org.mockito.Mock;
 
+import java.util.Date;
+
 /**
  * 测试基类 - 提供Mock对象和测试数据工厂
  */
@@ -74,6 +76,7 @@ public abstract class BaseTest {
         entity.setUserId(userId);
         entity.setAppealReason("测试申诉理由");
         entity.setAppealStatus(status);
+        entity.setProcessingVersion(1);
         return entity;
     }
 
@@ -85,6 +88,61 @@ public abstract class BaseTest {
         entity.setAdminUserId(adminUserId);
         entity.setScopeType(scopeType);
         entity.setScopeValue(scopeValue);
+        return entity;
+    }
+
+    /** 创建测试用治理批次 */
+    protected GovernanceBatchEntity createBatch(Long batchId, String batchType,
+                                                  Long adminId, int contentCount) {
+        GovernanceBatchEntity entity = new GovernanceBatchEntity();
+        entity.setBatchId(batchId);
+        entity.setBatchType(batchType);
+        entity.setAdminId(adminId);
+        entity.setReason("测试批次");
+        entity.setContentCount(contentCount);
+        entity.setCreateTime(new Date());
+        return entity;
+    }
+
+    /** 创建测试用信用补偿 */
+    protected CreditCompensationEntity createCompensation(Long compensationId, Long userId,
+                                                            Long appealId, Long contentId,
+                                                            int base, int bonus) {
+        CreditCompensationEntity entity = new CreditCompensationEntity();
+        entity.setCompensationId(compensationId);
+        entity.setUserId(userId);
+        entity.setAppealId(appealId);
+        entity.setContentId(contentId);
+        entity.setBaseCompensation(base);
+        entity.setBonusCompensation(bonus);
+        entity.setCreateTime(new Date());
+        return entity;
+    }
+
+    /** 创建测试用互动快照（含增强字段） */
+    protected InteractionSnapshotEntity createSnapshot(Long snapshotId, Long contentId,
+                                                         long loveCount, long commentCount) {
+        InteractionSnapshotEntity entity = new InteractionSnapshotEntity();
+        entity.setSnapshotId(snapshotId);
+        entity.setContentId(contentId);
+        entity.setLoveCount(loveCount);
+        entity.setCommentCount(commentCount);
+        entity.setRecommendCount(0L);
+        entity.setBookmarkCount(0L);
+        entity.setReportCount(0L);
+        entity.setSearchHitCount(0L);
+        entity.setSnapshotType("TAKEDOWN");
+        entity.setCreateTime(new Date());
+        return entity;
+    }
+
+    /** 创建测试用附件（含复核状态） */
+    protected CampusFileEntity createFile(Long fileId, Long contentId, Long userId,
+                                            int violationStatus, int reviewStatus) {
+        CampusFileEntity entity = new CampusFileEntity(fileId, userId, "/test/file.jpg");
+        entity.setContentId(contentId);
+        entity.setViolationStatus(violationStatus);
+        entity.setReviewStatus(reviewStatus);
         return entity;
     }
 }

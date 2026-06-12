@@ -43,4 +43,24 @@ public class CacheConstants {
      * 登录账户密码错误次数 redis key
      */
     public static final String PWD_ERR_CNT_KEY = "pwd_err_cnt:";
+
+    /**
+     * 内容详情缓存 key
+     */
+    public static final String CONTENT_DETAIL_KEY = "campus:content:detail:";
+
+    /**
+     * 内容列表缓存 key
+     */
+    public static final String CONTENT_LIST_KEY = "campus:content:list:";
+
+    /**
+     * 热门内容缓存 key
+     */
+    public static final String HOT_CONTENT_KEY = "campus:content:hot";
+
+    /**
+     * 用户内容列表缓存 key
+     */
+    public static final String USER_CONTENT_KEY = "campus:content:user:";
 }

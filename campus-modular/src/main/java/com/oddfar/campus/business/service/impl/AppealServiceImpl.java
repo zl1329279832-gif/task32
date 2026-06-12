@@ -35,6 +35,12 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
     private ModerationRecordService moderationRecordService;
     @Autowired
     private UserCreditService userCreditService;
+    @Autowired
+    private CreditCompensationService creditCompensationService;
+    @Autowired
+    private GovernanceCacheService governanceCacheService;
+    @Autowired
+    private InteractionSnapshotService snapshotService;
 
     @Override
     public int submitAppeal(Long contentId, String reason) {
@@ -59,8 +65,13 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
                     CampusBizCodeEnum.APPEAL_NOT_ELIGIBLE.getCode());
         }
 
-        // 检查是否已有待审或已通过的申诉（幂等防重复）
-        Long existingCount = appealMapper.selectPendingOrApprovedCount(contentId);
+        // 确定处理版本号（二次下架后递增）
+        AppealEntity latestAppeal = appealMapper.selectMaxVersionByContentId(contentId);
+        int nextVersion = (latestAppeal != null && latestAppeal.getProcessingVersion() != null)
+                ? latestAppeal.getProcessingVersion() + 1 : 1;
+
+        // 检查同版本是否已有待审或已通过的申诉（幂等防重复）
+        Long existingCount = appealMapper.selectPendingOrApprovedCountByVersion(contentId, nextVersion);
         if (existingCount > 0) {
             throw new ServiceException(CampusBizCodeEnum.APPEAL_ALREADY_EXISTS.getMsg(),
                     CampusBizCodeEnum.APPEAL_ALREADY_EXISTS.getCode());
@@ -73,6 +84,7 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
         appeal.setUserId(userId);
         appeal.setAppealReason(reason);
         appeal.setAppealStatus(0); // 待审
+        appeal.setProcessingVersion(nextVersion);
         return appealMapper.insert(appeal);
     }
 
@@ -106,9 +118,14 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
             contentService.restoreContent(appeal.getContentId(),
                     "申诉通过: " + reviewComment, "APPEAL");
 
-            // 信用分回补（幂等：changeCredit 内部检查是否已回补）
-            userCreditService.changeCredit(appeal.getUserId(), 5,
-                    "申诉通过，信用分回补", "appeal", appealId);
+            // 计算补偿分（高影响力内容额外补偿）
+            InteractionSnapshotEntity snapshot = snapshotService.getLatestSnapshot(appeal.getContentId());
+            int bonusComp = calculateBonusCompensation(snapshot);
+
+            // 创建补偿明细并执行信用分回补
+            creditCompensationService.compensate(
+                    appeal.getUserId(), appealId, appeal.getContentId(),
+                    5, bonusComp, "申诉通过补偿");
 
             // 记录信用分回补的审核日志
             moderationRecordService.recordAction(
@@ -116,6 +133,10 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
                     "APPEAL", "CREDIT_RESTORE",
                     "申诉通过信用分回补+5, appealId=" + appealId,
                     null, null, null);
+
+            // 清除缓存
+            governanceCacheService.evictContentCaches(appeal.getContentId());
+            governanceCacheService.evictUserCaches(appeal.getUserId());
         }
         // 如果拒绝(decision=2)，不做任何内容恢复操作，终局
 
@@ -135,5 +156,17 @@ public class AppealServiceImpl extends ServiceImpl<AppealMapper, AppealEntity>
     @Override
     public List<AppealEntity> getMyAppeals() {
         return appealMapper.selectByUserId(SecurityUtils.getUserId());
+    }
+
+    /**
+     * 根据影响力计算额外补偿分
+     */
+    private int calculateBonusCompensation(InteractionSnapshotEntity snapshot) {
+        if (snapshot == null) return 0;
+        long totalImpact = (snapshot.getLoveCount() != null ? snapshot.getLoveCount() : 0)
+                + (snapshot.getCommentCount() != null ? snapshot.getCommentCount() : 0) * 2;
+        if (totalImpact >= 100) return 10;
+        if (totalImpact >= 50) return 5;
+        return 0;
     }
 }

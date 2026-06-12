@@ -230,6 +230,25 @@ public class CampusFileServiceImpl extends ServiceImpl<CampusFileMapper, CampusF
 
         return rows;
     }
+
+    @Override
+    public int setReviewStatus(Long fileId, Integer reviewStatus) {
+        CampusFileEntity entity = campusFileMapper.selectById(fileId);
+        if (entity == null) {
+            throw new ServiceException("文件不存在");
+        }
+        entity.setReviewStatus(reviewStatus);
+        int rows = campusFileMapper.updateById(entity);
+
+        // 记录审核操作日志
+        moderationRecordService.recordAction(
+                entity.getContentId(), "FILE", fileId,
+                "MANUAL", "REVIEW",
+                "附件复核状态设置: " + reviewStatus,
+                null, null, null);
+
+        return rows;
+    }
 }
 
 

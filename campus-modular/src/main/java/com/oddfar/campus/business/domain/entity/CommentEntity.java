@@ -2,6 +2,7 @@ package com.oddfar.campus.business.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.oddfar.campus.common.domain.BaseEntity;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -67,5 +68,11 @@ public class CommentEntity extends BaseEntity {
      * 冻结状态：0=正常, 1=冻结(父内容被下架)
      */
     private Integer frozenStatus;
+
+    /**
+     * 评论只读截止时间（恢复后一段时间内禁止回复）
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    private java.util.Date readOnlyUntil;
 
 }

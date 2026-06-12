@@ -82,6 +82,13 @@ public class ContentLoveServiceImpl extends ServiceImpl<ContentLoveMapper, Conte
         }
     }
 
+    @Override
+    public Long countByContentId(Long contentId) {
+        return contentLoveMapper.selectCount(
+                new LambdaQueryWrapperX<ContentLoveEntity>()
+                        .eq(ContentLoveEntity::getContentId, contentId));
+    }
+
 }
 
 

@@ -35,4 +35,12 @@ public interface ContentLoveService extends IService<ContentLoveEntity> {
      * @return
      */
     List<Long> getLoveInfo(Long userId, List<ContentVo> contentVos);
+
+    /**
+     * 获取某内容的实际点赞数（用于对账）
+     *
+     * @param contentId 内容id
+     * @return 点赞数
+     */
+    Long countByContentId(Long contentId);
 }

@@ -43,4 +43,14 @@ public class ModerationRecordServiceImpl extends ServiceImpl<ModerationRecordMap
     public List<ModerationRecordEntity> getByContentId(Long contentId) {
         return moderationRecordMapper.selectByContentId(contentId);
     }
+
+    @Override
+    public List<ModerationRecordEntity> getByAdminId(Long adminId) {
+        return moderationRecordMapper.selectByAdminId(adminId);
+    }
+
+    @Override
+    public List<ModerationRecordEntity> getByBatchId(Long batchId) {
+        return moderationRecordMapper.selectByBatchId(batchId);
+    }
 }

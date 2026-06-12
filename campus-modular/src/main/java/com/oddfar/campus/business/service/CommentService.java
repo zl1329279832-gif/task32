@@ -105,4 +105,13 @@ public interface CommentService extends IService<CommentEntity> {
      */
     int unfreezeByContentId(Long contentId);
 
+    /**
+     * 解冻评论并设置只读期
+     *
+     * @param contentId       内容id
+     * @param readOnlyMinutes 只读时长（分钟）
+     * @return 影响行数
+     */
+    int unfreezeByContentIdWithReadOnly(Long contentId, int readOnlyMinutes);
+
 }

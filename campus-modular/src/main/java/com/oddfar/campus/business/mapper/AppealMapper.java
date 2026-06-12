@@ -36,4 +36,33 @@ public interface AppealMapper extends BaseMapperX<AppealEntity> {
                 .eq(AppealEntity::getContentId, contentId)
                 .in(AppealEntity::getAppealStatus, 0, 1));
     }
+
+    /**
+     * 根据内容id和版本查询是否存在待审或已通过的申诉
+     */
+    default Long selectPendingOrApprovedCountByVersion(Long contentId, Integer version) {
+        return selectCount(new LambdaQueryWrapperX<AppealEntity>()
+                .eq(AppealEntity::getContentId, contentId)
+                .eq(AppealEntity::getProcessingVersion, version)
+                .in(AppealEntity::getAppealStatus, 0, 1));
+    }
+
+    /**
+     * 查询某内容的最大申诉版本号
+     */
+    default AppealEntity selectMaxVersionByContentId(Long contentId) {
+        return selectOne(new LambdaQueryWrapperX<AppealEntity>()
+                .eq(AppealEntity::getContentId, contentId)
+                .orderByDesc(AppealEntity::getProcessingVersion)
+                .last("LIMIT 1"));
+    }
+
+    /**
+     * 根据内容id查询申诉列表
+     */
+    default List<AppealEntity> selectByContentId(Long contentId) {
+        return selectList(new LambdaQueryWrapperX<AppealEntity>()
+                .eq(AppealEntity::getContentId, contentId)
+                .orderByDesc(AppealEntity::getCreateTime));
+    }
 }

@@ -48,6 +48,12 @@ public class ContentRestoreFullTest extends BaseTest {
     private CategoryService categoryService;
     @Mock
     private ViolationRecordService violationRecordService;
+    @Mock
+    private GovernanceBatchService governanceBatchService;
+    @Mock
+    private GovernanceCacheService governanceCacheService;
+    @Mock
+    private ContentLoveService contentLoveService;
 
     @BeforeEach
     void setUp() {
@@ -106,7 +112,7 @@ public class ContentRestoreFullTest extends BaseTest {
         assertEquals(15L, content.getLoveCount());
 
         // 验证3: 评论被解冻
-        verify(commentService).unfreezeByContentId(1001L);
+        verify(commentService).unfreezeByContentIdWithReadOnly(1001L, 60);
 
         // 验证4: 两个附件违规被清除
         verify(fileService).clearViolation(2001L);
@@ -147,7 +153,7 @@ public class ContentRestoreFullTest extends BaseTest {
         // 验证：内容恢复
         assertEquals(1, content.getStatus());
         // 验证：评论解冻
-        verify(commentService).unfreezeByContentId(1001L);
+        verify(commentService).unfreezeByContentIdWithReadOnly(1001L, 60);
         // 验证：没有调用 clearViolation
         verify(fileService, never()).clearViolation(anyLong());
     }
@@ -194,6 +200,6 @@ public class ContentRestoreFullTest extends BaseTest {
         contentService.restoreContent(1001L, "申诉通过", "APPEAL");
 
         assertEquals(1, content.getStatus());
-        verify(commentService).unfreezeByContentId(1001L);
+        verify(commentService).unfreezeByContentIdWithReadOnly(1001L, 60);
     }
 }

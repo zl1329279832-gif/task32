@@ -56,4 +56,7 @@ public class ModerationRecordEntity extends BaseEntity {
 
     /** 快照评论数 */
     private Long snapshotCommentCount;
+
+    /** 关联治理批次id */
+    private Long batchId;
 }

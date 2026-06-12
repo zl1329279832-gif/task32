@@ -2,6 +2,7 @@ package com.oddfar.campus.business;
 
 import com.oddfar.campus.business.domain.entity.AppealEntity;
 import com.oddfar.campus.business.domain.entity.ContentEntity;
+import com.oddfar.campus.business.domain.entity.InteractionSnapshotEntity;
 import com.oddfar.campus.business.domain.entity.ModerationRecordEntity;
 import com.oddfar.campus.business.enums.CampusBizCodeEnum;
 import com.oddfar.campus.business.mapper.AppealMapper;
@@ -39,6 +40,12 @@ public class AppealRestoreTest extends BaseTest {
     private ModerationRecordService moderationRecordService;
     @Mock
     private UserCreditService userCreditService;
+    @Mock
+    private CreditCompensationService creditCompensationService;
+    @Mock
+    private GovernanceCacheService governanceCacheService;
+    @Mock
+    private InteractionSnapshotService snapshotService;
 
     @BeforeEach
     void setUp() {
@@ -55,7 +62,8 @@ public class AppealRestoreTest extends BaseTest {
     void submitAppealForRejectedContent() {
         ContentEntity content = createContent(1002L, 100L, 1L, "被拒绝的内容", 3, 0);
         when(contentMapper.selectById(1002L)).thenReturn(content);
-        when(appealMapper.selectPendingOrApprovedCount(1002L)).thenReturn(0L);
+        when(appealMapper.selectMaxVersionByContentId(1002L)).thenReturn(null);
+        when(appealMapper.selectPendingOrApprovedCountByVersion(1002L, 1)).thenReturn(0L);
         when(appealMapper.insert(any(AppealEntity.class))).thenReturn(1);
 
         try (MockedStatic<com.oddfar.campus.common.utils.SecurityUtils> secMock =
@@ -81,6 +89,11 @@ public class AppealRestoreTest extends BaseTest {
         AppealEntity appeal = createAppeal(5001L, 1002L, 100L, 0);
         when(appealMapper.selectById(5001L)).thenReturn(appeal);
         when(appealMapper.updateById(any())).thenReturn(1);
+        // mock快照用于计算补偿分
+        InteractionSnapshotEntity snapshot = new InteractionSnapshotEntity();
+        snapshot.setLoveCount(10L);
+        snapshot.setCommentCount(5L);
+        lenient().when(snapshotService.getLatestSnapshot(1002L)).thenReturn(snapshot);
 
         try (MockedStatic<com.oddfar.campus.common.utils.SecurityUtils> secMock =
                      mockStatic(com.oddfar.campus.common.utils.SecurityUtils.class)) {
@@ -92,8 +105,10 @@ public class AppealRestoreTest extends BaseTest {
             // 验证通过 contentService.restoreContent 统一恢复
             verify(contentService).restoreContent(eq(1002L),
                     contains("申诉通过"), eq("APPEAL"));
-            // 验证信用分回补
-            verify(userCreditService).changeCredit(eq(100L), eq(5), anyString(), eq("appeal"), eq(5001L));
+            // 验证信用分补偿明细被创建
+            verify(creditCompensationService).compensate(
+                    eq(100L), eq(5001L), eq(1002L),
+                    eq(5), anyInt(), anyString());
             // 验证审核记录
             verify(moderationRecordService).recordAction(eq(1002L), eq("CREDIT"), eq(100L),
                     eq("APPEAL"), eq("CREDIT_RESTORE"), anyString(), isNull(), isNull(), isNull());
@@ -118,8 +133,8 @@ public class AppealRestoreTest extends BaseTest {
             assertEquals(1, result);
             // 不应该调用内容恢复
             verify(contentService, never()).restoreContent(anyLong(), anyString(), anyString());
-            // 不应该调用信用分回补
-            verify(userCreditService, never()).changeCredit(anyLong(), anyInt(), anyString(), anyString(), anyLong());
+            // 不应该调用信用分补偿
+            verify(creditCompensationService, never()).compensate(anyLong(), anyLong(), anyLong(), anyInt(), anyInt(), anyString());
         }
     }
 
@@ -130,7 +145,8 @@ public class AppealRestoreTest extends BaseTest {
     void cannotSubmitDuplicateAppeal() {
         ContentEntity content = createContent(1002L, 100L, 1L, "被拒绝的内容", 3, 0);
         when(contentMapper.selectById(1002L)).thenReturn(content);
-        when(appealMapper.selectPendingOrApprovedCount(1002L)).thenReturn(1L);
+        when(appealMapper.selectMaxVersionByContentId(1002L)).thenReturn(null);
+        when(appealMapper.selectPendingOrApprovedCountByVersion(1002L, 1)).thenReturn(1L);
 
         try (MockedStatic<com.oddfar.campus.common.utils.SecurityUtils> secMock =
                      mockStatic(com.oddfar.campus.common.utils.SecurityUtils.class)) {

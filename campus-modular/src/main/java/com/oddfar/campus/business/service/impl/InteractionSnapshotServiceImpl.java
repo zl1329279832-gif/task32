@@ -46,6 +46,11 @@ public class InteractionSnapshotServiceImpl extends ServiceImpl<InteractionSnaps
         snapshot.setContentId(contentId);
         snapshot.setLoveCount(content.getLoveCount() != null ? content.getLoveCount() : 0L);
         snapshot.setCommentCount(commentCount != null ? commentCount : 0L);
+        // 增强快照字段（预留接入点，后续可接入推荐/收藏/举报/搜索服务）
+        snapshot.setRecommendCount(0L);
+        snapshot.setBookmarkCount(0L);
+        snapshot.setReportCount(0L);
+        snapshot.setSearchHitCount(0L);
         snapshot.setSnapshotType(snapshotType);
         snapshot.setModerationRecordId(moderationRecordId);
         snapshot.setCreateTime(new Date());

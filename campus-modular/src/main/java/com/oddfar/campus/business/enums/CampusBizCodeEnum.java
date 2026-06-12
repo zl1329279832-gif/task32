@@ -48,6 +48,7 @@ public enum CampusBizCodeEnum {
     APPEAL_NOT_OWNER(12010,"只能申诉自己的内容"),
     APPEAL_NOT_ELIGIBLE(12011,"该内容不符合申诉条件"),
     MODERATION_SCOPE_DENIED(12012,"无权审核该内容"),
+    BATCH_NOT_FOUND(12013,"治理批次不存在"),
 
     /**
      * 用户
@@ -62,11 +63,13 @@ public enum CampusBizCodeEnum {
     COMMENT_IS_NULL(13001,"评论不存在"),
     COMMENT_DEL_ERR(13002,"评论删除失败"),
     COMMENT_BLOCKED(13003,"评论包含违规内容，已被拦截"),
+    COMMENT_READ_ONLY(13004,"评论处于只读期，暂时无法回复"),
 
     /**
      * 附件
      */
     FILE_VIOLATION(10006,"附件被标记为违规"),
+    FILE_REVIEW_STATUS_INVALID(10007,"附件复核状态无效"),
 
 
     SMS_SEND_CODE_EXCEPTION(10403, "短信发送失败"),

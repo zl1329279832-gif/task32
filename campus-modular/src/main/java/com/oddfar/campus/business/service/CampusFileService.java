@@ -78,4 +78,13 @@ public interface CampusFileService extends IService<CampusFileEntity> {
      * @return 影响行数
      */
     int clearViolation(Long fileId);
+
+    /**
+     * 设置附件复核状态
+     *
+     * @param fileId       文件id
+     * @param reviewStatus 复核状态：0=未复核, 1=复核通过, 2=维持违规
+     * @return 影响行数
+     */
+    int setReviewStatus(Long fileId, Integer reviewStatus);
 }

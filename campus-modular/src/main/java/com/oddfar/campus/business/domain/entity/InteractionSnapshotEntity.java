@@ -27,6 +27,18 @@ public class InteractionSnapshotEntity {
     /** 快照时的评论数 */
     private Long commentCount;
 
+    /** 被推荐次数 */
+    private Long recommendCount;
+
+    /** 被收藏次数 */
+    private Long bookmarkCount;
+
+    /** 被举报次数 */
+    private Long reportCount;
+
+    /** 被搜索命中次数 */
+    private Long searchHitCount;
+
     /** 快照类型：TAKEDOWN/REJECT */
     private String snapshotType;
 

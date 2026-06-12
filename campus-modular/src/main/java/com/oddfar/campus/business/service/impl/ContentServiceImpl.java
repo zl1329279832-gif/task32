@@ -58,6 +58,12 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
     private InteractionSnapshotService snapshotService;
     @Resource
     private ViolationRecordService violationRecordService;
+    @Resource
+    private GovernanceBatchService governanceBatchService;
+    @Resource
+    private GovernanceCacheService governanceCacheService;
+    @Resource
+    private ContentLoveService contentLoveService;
 
     @Override
     public PageResult<ContentVo> page(ContentEntity contentEntity) {
@@ -196,6 +202,10 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
 
         Integer beforeStatus = contentEntity.getStatus();
 
+        // 创建治理批次
+        GovernanceBatchEntity batch = governanceBatchService.createBatch(
+                "TAKEDOWN", SecurityUtils.getUserId(), "管理员下架", 1);
+
         // 先拍摄互动数据快照（在冻结评论之前，保证快照包含真实的评论数）
         InteractionSnapshotEntity snapshot = snapshotService.takeSnapshot(contentId, "TAKEDOWN", null);
 
@@ -208,16 +218,20 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
                 "MANUAL", "TAKEDOWN", "管理员下架",
                 null, beforeStatus, 2);
 
-        // 回填快照统计到审核记录
+        // 回填快照统计和批次id到审核记录
         if (snapshot != null) {
             record.setSnapshotLoveCount(snapshot.getLoveCount());
             record.setSnapshotCommentCount(snapshot.getCommentCount());
-            moderationRecordService.updateById(record);
         }
+        record.setBatchId(batch.getBatchId());
+        moderationRecordService.updateById(record);
 
         // 更新状态为下架
         contentEntity.setStatus(2);
         contentMapper.updateById(contentEntity);
+
+        // 清除相关缓存
+        governanceCacheService.evictContentCaches(contentId);
     }
 
     @Override
@@ -250,17 +264,28 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
             content.setLoveCount(snapshot.getLoveCount());
         }
 
+        // 点赞对账：如果实际点赞数 > 快照点赞数，保留实际值
+        Long actualLoveCount = contentLoveService.countByContentId(contentId);
+        if (actualLoveCount != null && snapshot != null && snapshot.getLoveCount() != null
+                && actualLoveCount > snapshot.getLoveCount()) {
+            content.setLoveCount(actualLoveCount);
+        }
+
         contentMapper.updateById(content);
 
-        // 3. 解冻评论
-        commentService.unfreezeByContentId(contentId);
+        // 3. 解冻评论并设置只读期（默认60分钟）
+        commentService.unfreezeByContentIdWithReadOnly(contentId, 60);
 
-        // 4. 清除附件违规标记（恢复关联文件）
+        // 4. 清除附件违规标记（仅清除复核状态非"维持违规"的附件）
         List<CampusFileEntity> files = fileService.list(
                 new LambdaQueryWrapperX<CampusFileEntity>()
                         .eq(CampusFileEntity::getContentId, contentId)
                         .eq(CampusFileEntity::getViolationStatus, 1));
         for (CampusFileEntity file : files) {
+            // 维持违规(reviewStatus=2)的附件不清除
+            if (file.getReviewStatus() != null && file.getReviewStatus() == 2) {
+                continue;
+            }
             fileService.clearViolation(file.getFileId());
             // 记录附件违规清除的审核日志
             moderationRecordService.recordAction(
@@ -283,6 +308,9 @@ public class ContentServiceImpl extends ServiceImpl<ContentMapper, ContentEntity
             record.setSnapshotCommentCount(snapshot.getCommentCount());
             moderationRecordService.updateById(record);
         }
+
+        // 清除相关缓存
+        governanceCacheService.evictContentCaches(contentId);
     }
 
     @Override
